@@ -5,7 +5,19 @@
  * and the x-company-id header for tenant scoping.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:5000/api';
+    }
+    return `${window.location.origin}/api`;
+  }
+  return '/api';
+};
+
+const API_BASE = getApiBase();
+
 
 /**
  * Get authorization headers including JWT token and tenant ID.

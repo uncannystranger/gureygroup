@@ -181,7 +181,9 @@ router.post('/invitations', requireRole(['Owner', 'Admin']), async (req, res) =>
       expiresAt,
     });
 
-    const inviteUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invite/${token}`;
+    const origin = req.headers.origin || process.env.FRONTEND_URL || (req.headers.host ? `${req.protocol || 'https'}://${req.headers.host}` : 'http://localhost:3000');
+    const inviteUrl = `${origin}/invite/${token}`;
+
 
     await Audit.create({
       companyId,

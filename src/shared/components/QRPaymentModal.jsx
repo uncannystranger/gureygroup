@@ -85,13 +85,14 @@ export default function QRPaymentModal({ total, onClose }) {
         <div className="flex flex-col items-center space-y-3">
           <div className="p-4 rounded-3xl bg-white shadow-lg border border-slate-100">
             <QRCodeSVG
-              value={ussdString}
+              value={dialerUrl}
               size={200}
               level="H"
               includeMargin={false}
               bgColor="#ffffff"
               fgColor="#0f172a"
             />
+
           </div>
           <p className="text-[10px] font-semibold text-slate-400 text-center leading-snug">
             Customer scans this code with their mobile money app or camera
