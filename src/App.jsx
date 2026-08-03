@@ -26,7 +26,9 @@ import SessionsScreen from './features/audit/SessionsScreen';
 import OrganizationSettingsScreen from './features/settings/OrganizationSettingsScreen';
 import AuthScreen from './features/auth/AuthScreen';
 import VerifyEmailScreen from './features/auth/VerifyEmailScreen';
+import AiAssistantWidget from './features/ai_assistant/AiAssistantWidget';
 import { Sparkles } from 'lucide-react';
+
 
 function MainAppContent() {
   const { isAuthenticated, isEmailVerified, authLoading } = useAuth();
@@ -215,12 +217,19 @@ function MainAppContent() {
         onClose={() => setIsModalOpen(false)}
       />
 
+      {/* Floating Interactive AI Assistant with Micro-Animations & Monthly Report */}
+      <AiAssistantWidget 
+        setActiveTab={setActiveTab} 
+        onOpenAddProduct={() => setIsModalOpen(true)} 
+      />
+
       {/* Floating Bottom-Right Toast Notifications */}
       <NotificationToast />
 
     </div>
   );
 }
+
 
 export default function App() {
   return (
