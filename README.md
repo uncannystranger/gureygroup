@@ -1,5 +1,6 @@
 <div align="center">
-![Uploading Screenshot 2026-08-03 at 22.01.55.png…]()
+
+  <img width="1440" height="702" alt="Screenshot 2026-08-03 at 22 01 55" src="https://github.com/user-attachments/assets/fdb58673-d993-4cf6-a2b8-32d10442f9f0" />
 
   # 💎 Gurey Group — Enterprise Multi-Tenant SaaS Platform
 
