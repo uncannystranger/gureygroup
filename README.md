@@ -1,4 +1,5 @@
 <div align="center">
+![Uploading Screenshot 2026-08-03 at 22.01.55.png…]()
 
   # 💎 Gurey Group — Enterprise Multi-Tenant SaaS Platform
 
