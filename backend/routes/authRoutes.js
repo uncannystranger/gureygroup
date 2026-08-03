@@ -3,10 +3,9 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Company from '../models/Company.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation } from '../middleware/auth.js';
+import { enforceTenantIsolation, JWT_SECRET } from '../middleware/auth.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'gurey_enterprise_jwt_secret_key_2026_super_secure';
 
 /**
  * POST /api/auth/google
