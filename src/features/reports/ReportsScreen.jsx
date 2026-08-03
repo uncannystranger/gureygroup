@@ -65,7 +65,7 @@ export default function ReportsScreen() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 page-enter">
       
       {/* Top Header & Export Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -190,7 +190,7 @@ export default function ReportsScreen() {
 
         {/* Report 1: Sales & Revenue */}
         {selectedReport === 'Sales' && (
-          <div className="overflow-x-auto">
+          <div className="responsive-table-wrapper">
             <table className="w-full text-left text-xs font-semibold">
               <thead>
                 <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">
@@ -248,7 +248,7 @@ export default function ReportsScreen() {
 
         {/* Report 3: Inventory Valuation */}
         {selectedReport === 'Inventory' && (
-          <div className="overflow-x-auto">
+          <div className="responsive-table-wrapper">
             <table className="w-full text-left text-xs font-semibold">
               <thead>
                 <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">
@@ -284,7 +284,7 @@ export default function ReportsScreen() {
 
         {/* Report 4: Product Performance */}
         {selectedReport === 'Product' && (
-          <div className="overflow-x-auto">
+          <div className="responsive-table-wrapper">
             <table className="w-full text-left text-xs font-semibold">
               <thead>
                 <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">
@@ -314,7 +314,7 @@ export default function ReportsScreen() {
 
         {/* Report 5: Tax & VAT Audit */}
         {selectedReport === 'Tax' && (
-          <div className="overflow-x-auto">
+          <div className="responsive-table-wrapper">
             <table className="w-full text-left text-xs font-semibold">
               <thead>
                 <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">

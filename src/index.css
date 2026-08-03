@@ -342,3 +342,181 @@ html.theme-transition select {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Skeleton Loader                                                      */
+/* ------------------------------------------------------------------ */
+@keyframes skeletonShimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(203, 213, 225, 0.5) 25%,
+    rgba(226, 232, 240, 0.8) 50%,
+    rgba(203, 213, 225, 0.5) 75%
+  );
+  background-size: 800px 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+  border-radius: 0.75rem;
+}
+
+.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(30, 41, 59, 0.6) 25%,
+    rgba(51, 65, 85, 0.8) 50%,
+    rgba(30, 41, 59, 0.6) 75%
+  );
+  background-size: 800px 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-text    { height: 0.75rem; }
+.skeleton-title   { height: 1.1rem; width: 60%; }
+.skeleton-avatar  { width: 2.5rem; height: 2.5rem; border-radius: 50%; }
+.skeleton-card    { height: 7rem; }
+.skeleton-row     { height: 2.75rem; }
+.skeleton-badge   { height: 1.4rem; width: 4rem; border-radius: 9999px; }
+
+/* ------------------------------------------------------------------ */
+/* Page & Section Entrance Transitions                                  */
+/* ------------------------------------------------------------------ */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.page-enter {
+  animation: slideUpFade 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.section-enter {
+  animation: fadeScaleIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggered children — use with nth-child or inline style delay */
+.stagger-1 { animation-delay: 50ms;  }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+
+/* ------------------------------------------------------------------ */
+/* Enhanced Responsive Tables                                           */
+/* ------------------------------------------------------------------ */
+.responsive-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148,163,184,0.3) transparent;
+  width: 100%;
+  border-radius: 1rem;
+}
+
+.responsive-table-wrapper::-webkit-scrollbar {
+  height: 4px;
+}
+.responsive-table-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+.responsive-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(148,163,184,0.35);
+  border-radius: 9999px;
+}
+
+/* Minimum width so tables don't collapse on mobile */
+.responsive-table-wrapper table {
+  min-width: 540px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Floating Action Button (mobile FAB)                                  */
+/* ------------------------------------------------------------------ */
+.fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 30;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.18s ease;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.22), 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.fab:active {
+  transform: scale(0.96);
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile-first stat card grid tweak                                    */
+/* ------------------------------------------------------------------ */
+@media (max-width: 479px) {
+  .stat-grid-2col {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* QR Modal entrance                                                    */
+/* ------------------------------------------------------------------ */
+@keyframes qrModalIn {
+  from { opacity: 0; transform: scale(0.9) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.qr-modal-card {
+  animation: qrModalIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ------------------------------------------------------------------ */
+/* Toast / Notification banner                                          */
+/* ------------------------------------------------------------------ */
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(120%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastSlideOut {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(120%); }
+}
+
+.toast-enter { animation: toastSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.toast-exit  { animation: toastSlideOut 0.25s ease-in both; }
+
+/* ------------------------------------------------------------------ */
+/* Smooth scrollbar for long panels                                     */
+/* ------------------------------------------------------------------ */
+.custom-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148,163,184,0.25) transparent;
+}
+.custom-scroll::-webkit-scrollbar       { width: 4px; }
+.custom-scroll::-webkit-scrollbar-track { background: transparent; }
+.custom-scroll::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 9999px; }
+
+/* ------------------------------------------------------------------ */
+/* Focus ring override for keyboard nav                                 */
+/* ------------------------------------------------------------------ */
+:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.7);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}

@@ -7,7 +7,10 @@ import {
   CreditCard, 
   Database, 
   Plug, 
-  Download 
+  Download,
+  Smartphone,
+  QrCode,
+  CheckCircle2
 } from 'lucide-react';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
@@ -22,6 +25,18 @@ export default function SettingsScreen({ initialTab }) {
   const [activeGroup, setActiveGroup] = useState(() => {
     return initialTab || 'profile';
   });
+
+  // Mobile Money merchant number — persisted to localStorage
+  const [merchantNumber, setMerchantNumber] = useState(() => {
+    try { return localStorage.getItem('gurey_merchant_number') || '615283292'; } catch { return '615283292'; }
+  });
+  const [merchantSaved, setMerchantSaved] = useState(false);
+
+  const saveMerchantNumber = () => {
+    try { localStorage.setItem('gurey_merchant_number', merchantNumber.trim()); } catch {}
+    setMerchantSaved(true);
+    setTimeout(() => setMerchantSaved(false), 2500);
+  };
 
   useEffect(() => {
     if (initialTab) {
@@ -40,7 +55,7 @@ export default function SettingsScreen({ initialTab }) {
   ];
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 page-enter">
       
       {/* Header */}
       <div>
@@ -173,14 +188,62 @@ export default function SettingsScreen({ initialTab }) {
 
       {/* Group: Advanced */}
       {activeGroup === 'advanced' && (
-        <div className="glass-panel rounded-4xl p-6 space-y-4 card-hover-lift">
-          <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-            <Plug className="w-4 h-4 text-indigo-500" /> Developer API & Hardware Integrations
-          </h3>
-          <p className="text-xs text-slate-400">Configure Stripe, Square Terminal, Mobile Money, and Thermal Printers.</p>
-          
-          <div className="p-4 rounded-3xl bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs font-mono">
-            API Secret Key: <span className="text-indigo-500">vk_live_8901239849201948</span>
+        <div className="space-y-5">
+
+          {/* Mobile Money / QR Payment Config */}
+          <div className="glass-panel rounded-4xl p-6 space-y-4 card-hover-lift">
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-emerald-500" /> Mobile Money & QR Payment
+            </h3>
+            <p className="text-xs text-slate-400">
+              Set your merchant number for EVC, Zaad, or Sahal. This number is embedded in every QR code generated at POS checkout.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Merchant Number</label>
+                <input
+                  type="tel"
+                  value={merchantNumber}
+                  onChange={(e) => setMerchantNumber(e.target.value)}
+                  placeholder="e.g. 615283292"
+                  className="w-full px-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+                <p className="text-[10px] text-slate-400 mt-1 font-medium">Used in USSD string: <code className="font-mono text-emerald-600 dark:text-emerald-400">*712*{merchantNumber || 'XXXXXXX'}*{'<amount>'}#</code></p>
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={saveMerchantNumber}
+                  className={`flex items-center space-x-2 px-5 py-2.5 rounded-2xl font-black text-xs transition-all hover:scale-[1.02] active:scale-[0.98] btn-micro ${
+                    merchantSaved
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-slate-900 dark:bg-white text-white dark:text-slate-950'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{merchantSaved ? 'Saved!' : 'Save Merchant Number'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+              <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Preview USSD Code</p>
+              <p className="font-mono text-sm font-black text-slate-900 dark:text-white">*712*{merchantNumber || 'XXXXXXX'}*[AMOUNT]#</p>
+              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">This is what gets encoded into the QR code at checkout.</p>
+            </div>
+          </div>
+
+          {/* Developer API */}
+          <div className="glass-panel rounded-4xl p-6 space-y-4 card-hover-lift">
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <Plug className="w-4 h-4 text-indigo-500" /> Developer API & Hardware Integrations
+            </h3>
+            <p className="text-xs text-slate-400">Configure Stripe, Square Terminal, Mobile Money, and Thermal Printers.</p>
+            
+            <div className="p-4 rounded-3xl bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs font-mono">
+              API Secret Key: <span className="text-indigo-500">vk_live_8901239849201948</span>
+            </div>
           </div>
         </div>
       )}

@@ -128,7 +128,7 @@ export default function AttendanceScreen() {
   ];
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 page-enter">
       {/* Header */}
       <div>
         <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Attendance</h2>

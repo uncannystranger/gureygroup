@@ -43,7 +43,7 @@ export default function SessionsScreen() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 page-enter">
       <div>
         <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Session Monitoring</h2>
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Track active login sessions and session history</p>

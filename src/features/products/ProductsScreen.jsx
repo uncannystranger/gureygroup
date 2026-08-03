@@ -147,7 +147,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
   ];
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 page-enter">
       
       {/* Top Controls & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -521,7 +521,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
       {activeSubTab === 'expiries' && (
         <div className="glass-panel rounded-4xl p-6 space-y-4 card-hover-lift">
           <h3 className="text-base font-black text-slate-900 dark:text-white">Cosmetics Expiration Dates & Clearance Alert</h3>
-          <div className="overflow-x-auto">
+          <div className="responsive-table-wrapper">
             <table className="w-full text-left text-xs font-semibold">
               <thead>
                 <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">

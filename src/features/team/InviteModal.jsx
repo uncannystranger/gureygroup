@@ -9,7 +9,7 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
   const [branchId, setBranchId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [inviteUrl, setInviteUrl] = useState(null);
+  const [inviteResult, setInviteResult] = useState(null);
   const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -24,7 +24,7 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
         role,
         branchId: branchId || null,
       });
-      setInviteUrl(result.inviteUrl);
+      setInviteResult(result);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -33,14 +33,15 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
   };
 
   const handleCopy = async () => {
-    if (!inviteUrl) return;
+    const url = inviteResult?.inviteUrl;
+    if (!url) return;
     try {
-      await navigator.clipboard.writeText(inviteUrl);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       const input = document.createElement('input');
-      input.value = inviteUrl;
+      input.value = url;
       document.body.appendChild(input);
       input.select();
       document.execCommand('copy');
@@ -54,7 +55,7 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
     setEmail('');
     setRole('Employee');
     setBranchId('');
-    setInviteUrl(null);
+    setInviteResult(null);
     setError(null);
   };
 
@@ -81,16 +82,26 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
           <div className="mb-4 p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium">{error}</div>
         )}
 
-        {inviteUrl ? (
+        {inviteResult ? (
           <div className="space-y-4">
-            <div className="flex items-center space-x-2 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-              <span className="text-xs font-bold text-emerald-400">Invitation created successfully!</span>
-            </div>
+            {inviteResult?.isOfflineFallback ? (
+              <div className="flex items-start space-x-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                <span className="text-amber-400 text-sm shrink-0">⚠️</span>
+                <div>
+                  <p className="text-xs font-black text-amber-400">Offline Mode — Backend unreachable</p>
+                  <p className="text-[10px] text-amber-400/80 mt-0.5">The invite link was generated locally. It will sync automatically once the backend server is back online.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                <span className="text-xs font-bold text-emerald-400">Invitation created successfully!</span>
+              </div>
+            )}
             <div>
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Invitation Link</label>
               <div className="flex items-center space-x-2">
-                <input type="text" readOnly value={inviteUrl} className="flex-1 px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-600 dark:text-slate-300" />
+                <input type="text" readOnly value={inviteResult.inviteUrl} className="flex-1 px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-600 dark:text-slate-300" />
                 <button onClick={handleCopy} className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-105'}`}>
                   {copied ? <span className="flex items-center space-x-1"><CheckCircle2 className="w-3.5 h-3.5" /><span>Copied!</span></span> : <span className="flex items-center space-x-1"><Copy className="w-3.5 h-3.5" /><span>Copy</span></span>}
                 </button>

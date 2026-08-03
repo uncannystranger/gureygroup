@@ -11,7 +11,8 @@ import {
   Users,
   PauseCircle,
   RotateCcw,
-  UserPlus
+  UserPlus,
+  QrCode
 } from 'lucide-react';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
@@ -19,6 +20,7 @@ import ReceiptModal from '../../shared/components/ReceiptModal';
 import InvoiceModal from '../../shared/components/InvoiceModal';
 import HeldCartsModal from '../../shared/components/HeldCartsModal';
 import AddCustomerModal from '../../shared/components/AddCustomerModal';
+import QRPaymentModal from '../../shared/components/QRPaymentModal';
 
 function POSProductImageWithSkeleton({ src, alt }) {
   const [loaded, setLoaded] = useState(false);
@@ -69,6 +71,7 @@ export default function POSScreen() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isHeldModalOpen, setIsHeldModalOpen] = useState(false);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
   // Return & Refund State
   const [selectedRefundSale, setSelectedRefundSale] = useState(null);
@@ -188,7 +191,7 @@ export default function POSScreen() {
   ];
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 page-enter">
       
       {/* Sub-Navigation Tabs for Sales Section */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10">
@@ -441,6 +444,17 @@ export default function POSScreen() {
                     </div>
                   )}
 
+                  {/* Mobile Money QR Button */}
+                  {paymentMethod === 'Mobile Money' && cart.length > 0 && (
+                    <button
+                      onClick={() => setIsQRModalOpen(true)}
+                      className="w-full py-2.5 rounded-2xl border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 font-black text-xs transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center space-x-2 btn-micro animate-fade-in-up"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      <span>Show Mobile Money QR Code</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={handleCheckout}
                     disabled={cart.length === 0}
@@ -652,6 +666,13 @@ export default function POSScreen() {
         onClose={() => setIsAddCustomerOpen(false)}
         onCustomerAdded={(newCust) => setSelectedCustomer(newCust.name)}
       />
+
+      {isQRModalOpen && (
+        <QRPaymentModal
+          total={grandTotal}
+          onClose={() => setIsQRModalOpen(false)}
+        />
+      )}
 
     </div>
   );

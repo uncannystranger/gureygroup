@@ -169,10 +169,10 @@ export default function Header({ setActiveTab, onOpenSearch, currentTab, onToggl
           )}
         </div>
 
-        {/* Dark / Light / System Theme Toggle */}
+        {/* Dark / Light / System Theme Toggle (Desktop Only — on mobile it lives in navigation drawer) */}
         <button
           onClick={handleToggleTheme}
-          className="w-9 h-9 rounded-xl bg-white/60 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 text-slate-700 dark:text-slate-300 flex items-center justify-center hover:bg-white dark:hover:bg-white/15 transition-all shadow-xs btn-micro"
+          className="hidden md:flex w-9 h-9 rounded-xl bg-white/60 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 text-slate-700 dark:text-slate-300 items-center justify-center hover:bg-white dark:hover:bg-white/15 transition-all shadow-xs btn-micro"
           title={`Theme Mode: ${themeMode}`}
           aria-label="Toggle Theme Mode"
         >
@@ -185,8 +185,8 @@ export default function Header({ setActiveTab, onOpenSearch, currentTab, onToggl
           )}
         </button>
 
-        {/* Profile Picture Avatar & Micro-animated Dropdown with Language Switcher */}
-        <div className="relative" ref={profileRef}>
+        {/* Profile Picture Avatar & Dropdown (Desktop Only — on mobile it lives in navigation drawer) */}
+        <div className="hidden md:block relative" ref={profileRef}>
           <button 
             onClick={() => setIsProfileOpen(!isProfileOpen)}
             className="relative p-0.5 rounded-full border-2 border-indigo-500/40 hover:border-indigo-500 hover:scale-105 transition-all block duration-200 shadow-sm hover:shadow-indigo-500/20 btn-micro"

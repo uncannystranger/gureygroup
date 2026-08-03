@@ -18,6 +18,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 // Security & Optimization Middleware
 app.use(helmet());
@@ -38,7 +39,8 @@ app.get('/api/health', (req, res) => {
     status: 'healthy',
     service: 'Gurey Group Enterprise Multi-Tenant SaaS API',
     timestamp: new Date().toISOString(),
-    database: 'MongoDB Atlas Connected'
+    database: 'MongoDB Atlas Connected',
+    version: '2.0.0'
   });
 });
 
@@ -52,10 +54,37 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/branches', branchRoutes);
 app.use('/api/sessions', sessionRoutes);
 
+// ─── 404 Catch-all ──────────────────────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// ─── Global Error Handler ────────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
+  const isDev = !IS_PROD;
+
+  console.error(`[Gurey Group Error] ${req.method} ${req.originalUrl}`, {
+    status,
+    message: err.message,
+    stack: isDev ? err.stack : undefined,
+  });
+
+  res.status(status).json({
+    error: IS_PROD && status === 500 ? 'Internal server error' : err.message,
+    ...(isDev && { stack: err.stack }),
+  });
+});
+
 // Initialize MongoDB & Start Express Server
 connectMongoDB().then(() => {
   app.listen(PORT, () => {
     console.log(`[Gurey Group Backend Server] Running on port ${PORT}`);
     console.log(`[Gurey Group Backend Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[Gurey Group Backend Server] Health: http://localhost:${PORT}/api/health`);
   });
+}).catch((err) => {
+  console.error('[Gurey Group Backend Server] Failed to connect to MongoDB:', err.message);
+  process.exit(1);
 });

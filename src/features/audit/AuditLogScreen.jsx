@@ -54,7 +54,7 @@ export default function AuditLogScreen() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 page-enter">
       <div>
         <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Audit Logs</h2>
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Complete activity trail of all actions in your organization</p>
