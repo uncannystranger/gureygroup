@@ -1,0 +1,344 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+}
+
+/* Custom Liquid Glass & Neumorphic Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 
+    0 15px 35px -5px rgba(0, 0, 0, 0.04),
+    0 5px 15px rgba(0, 0, 0, 0.02),
+    inset 0 1px 1px rgba(255, 255, 255, 0.9);
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.60);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 20px 40px -10px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.4);
+}
+
+/* Interconnected Connected Capsule Nodes */
+.capsule-mesh-gradient {
+  background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.85) 0%, rgba(59, 130, 246, 0.8) 50%, rgba(139, 92, 246, 0.9) 100%);
+  box-shadow: 0 0 35px rgba(99, 102, 241, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+
+.dark .capsule-mesh-gradient {
+  background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.95) 0%, rgba(59, 130, 246, 0.85) 50%, rgba(139, 92, 246, 0.95) 100%);
+  box-shadow: 0 0 45px rgba(99, 102, 241, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+}
+
+/* Financial Health Blue Card Gradient */
+.health-card-gradient {
+  background: linear-gradient(135deg, #4F80FF 0%, #3B82F6 40%, #2563EB 100%);
+  box-shadow: 0 20px 40px -10px rgba(59, 130, 246, 0.4);
+}
+
+/* Glass Pill Buttons */
+.glass-pill {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), 
+              background-color 180ms cubic-bezier(0.2, 0.8, 0.2, 1), 
+              box-shadow 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.glass-pill:hover {
+  background: rgba(255, 255, 255, 0.8);
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.08);
+}
+
+.glass-pill:active {
+  transform: scale(0.98);
+}
+
+.dark .glass-pill {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.dark .glass-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.4);
+}
+
+.dark .glass-pill:active {
+  transform: scale(0.98);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* High Performance GPU Micro Animations (120-220ms) */
+
+/* Page View Transition */
+@keyframes pageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-transition {
+  animation: pageSlideIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* Table Row & List Item Slide-up */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 160ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* Modal & Dropdown Scale Fade-In */
+@keyframes fadeScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-scale {
+  animation: fadeScaleIn 160ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* Dropdown Slide 6px Down */
+@keyframes dropdownSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown {
+  animation: dropdownSlideDown 150ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* Invalid Input Shake Animation */
+@keyframes shakeInput {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shakeInput 180ms ease-in-out;
+}
+
+/* Toast Progress Bar Timer */
+@keyframes toastProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+.animate-toast-progress {
+  animation: toastProgress 3500ms linear forwards;
+}
+
+/* Floating Slow */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+.animate-float {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.03); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+/* Smooth 200ms Theme Transition enabled post-paint */
+html.theme-transition,
+html.theme-transition body,
+html.theme-transition .glass-panel,
+html.theme-transition button,
+html.theme-transition input,
+html.theme-transition select {
+  transition: background-color 200ms cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 200ms cubic-bezier(0.4, 0, 0.2, 1), 
+              color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Interactive Card Micro Lift */
+.card-hover-lift {
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* Button Micro Press */
+.btn-micro {
+  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              filter 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              opacity 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.btn-micro:hover {
+  filter: brightness(1.05);
+}
+
+.btn-micro:active {
+  transform: scale(0.98);
+}
+
+/* ------------------------------------------------------------------ */
+/* Session Startup Loader Micro-Animations                              */
+/* ------------------------------------------------------------------ */
+
+/* Breathing glow orb — scale + opacity pulse, ~2s loop */
+@keyframes sessionOrbPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 35px rgba(99, 102, 241, 0.45), 0 0 70px rgba(99, 102, 241, 0.15);
+  }
+  50% {
+    transform: scale(1.07);
+    box-shadow: 0 0 55px rgba(99, 102, 241, 0.65), 0 0 110px rgba(99, 102, 241, 0.25);
+  }
+}
+
+.animate-session-orb {
+  animation: sessionOrbPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: transform, box-shadow;
+}
+
+/* Staggered dot fade — each dot pulses in sequence */
+@keyframes dotFade {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
+  40%           { opacity: 1;   transform: scale(1.2);  }
+}
+
+.animate-dot-stagger-1 {
+  animation: dotFade 1.2s ease-in-out infinite;
+  animation-delay: 0ms;
+  will-change: opacity, transform;
+}
+
+.animate-dot-stagger-2 {
+  animation: dotFade 1.2s ease-in-out infinite;
+  animation-delay: 200ms;
+  will-change: opacity, transform;
+}
+
+.animate-dot-stagger-3 {
+  animation: dotFade 1.2s ease-in-out infinite;
+  animation-delay: 400ms;
+  will-change: opacity, transform;
+}
+
+/* Accessibility: Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive Layout Utilities                                         */
+/* ------------------------------------------------------------------ */
+
+/* Mobile sidebar overlay backdrop */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Responsive table wrapper */
+.responsive-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  width: 100%;
+}
+
+/* Responsive padding and layout tweaks for small screens */
+@media (max-width: 640px) {
+  .glass-panel {
+    border-radius: 1.25rem;
+  }
+}
+
