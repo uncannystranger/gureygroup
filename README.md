@@ -2,212 +2,151 @@
 
   <img width="1440" height="702" alt="Screenshot 2026-08-03 at 22 01 55" src="https://github.com/user-attachments/assets/fdb58673-d993-4cf6-a2b8-32d10442f9f0" />
 
-  # 💎 Gurey Group — Enterprise Multi-Tenant SaaS Platform
+  # ◈ GUREY GROUP // OPERATING SYSTEM FOR MODERN COMMERCE
 
-  <p align="center">
-    <strong>A State-of-the-Art Liquid Glassmorphism POS, Inventory Management & Financial Analytics Suite</strong>
+  <p>
+    <img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=700&size=16&duration=2600&pause=900&color=00F0FF&center=true&vCenter=true&width=720&lines=POINT+OF+SALE+%2B+INVENTORY+%2B+ANALYTICS;MULTI-TENANT+COMMERCE+INFRASTRUCTURE;BUILT+WITH+MOTION%2C+SIGNALS%2C+AND+PRECISION" alt="Animated project description" />
   </p>
 
-  <p align="center">
-    <a href="#-key-features">Features</a> •
-    <a href="#-tech-stack">Tech Stack</a> •
-    <a href="#-responsive-design--micro-animations">Design & UI</a> •
-    <a href="#-getting-started">Getting Started</a> •
-    <a href="#-architecture">Architecture</a> •
-    <a href="#-security--hardening">Security</a>
+  <p>
+    <a href="#-system-capabilities">CAPABILITIES</a> ·
+    <a href="#-interface-protocol">INTERFACE</a> ·
+    <a href="#-architecture-grid">ARCHITECTURE</a> ·
+    <a href="#-launch-sequence">LAUNCH</a>
   </p>
 
-  <div>
-    <img src="https://img.shields.io/badge/React-18.3.1-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 18" />
-    <img src="https://img.shields.io/badge/Tailwind_CSS-3.4-38BDF8?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
-    <img src="https://img.shields.io/badge/Node.js-Express_4-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Express Node" />
-    <img src="https://img.shields.io/badge/MongoDB-Atlas_DB-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB" />
-    <img src="https://img.shields.io/badge/Firebase-Auth_&_RTDB-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase" />
-    <img src="https://img.shields.io/badge/Security-Zero_Trust_Hardened-00C853?style=for-the-badge&logo=shieldsdotio&logoColor=white" alt="Security" />
-  </div>
+  <p>
+    <img src="https://img.shields.io/badge/STATUS-ONLINE-00ff9d?style=for-the-badge&labelColor=090b16" alt="Status online" />
+    <img src="https://img.shields.io/badge/REACT-18.3.1-00f0ff?style=for-the-badge&logo=react&logoColor=00f0ff&labelColor=090b16" alt="React 18.3.1" />
+    <img src="https://img.shields.io/badge/NODE-EXPRESS-ff2bd6?style=for-the-badge&logo=nodedotjs&logoColor=ff2bd6&labelColor=090b16" alt="Node Express" />
+    <img src="https://img.shields.io/badge/MONGO-ATLAS-00ff9d?style=for-the-badge&logo=mongodb&logoColor=00ff9d&labelColor=090b16" alt="MongoDB Atlas" />
+  </p>
 
-  <br />
-
-  <sub>Made with 🧡 by uncannystranger</sub>
+  <sub>Made with 🧡 by <strong>uncannystranger</strong></sub>
 </div>
 
----
+<br />
 
-## 🌟 Overview
+> **/// SYSTEM BRIEF**
+> Gurey Group is a multi-tenant SaaS command layer for retail teams: fast POS operations, live inventory, branch control, financial reporting, and secure collaboration in one responsive workspace.
 
-**Gurey Group** is a next-generation enterprise multi-tenant SaaS application built for modern businesses, retail chains, and luxury boutiques. Designed with a **Liquid Glassmorphism UI**, micro-animations, and fluid responsive layouts, it provides complete store management—from high-velocity Point-of-Sale (POS) transactions and mobile money USSD payments to role-based access control (RBAC), live multi-warehouse inventory, and thermal receipt streaming.
+<div align="center">
 
----
+`[ SIGNAL: LIQUID GLASS ]`　`[ MOTION: ENABLED ]`　`[ TENANCY: ISOLATED ]`　`[ ACCESS: RBAC ]`
 
-## ✨ Key Features
+</div>
 
-### 🛒 High-Speed Point-of-Sale (POS) & Mobile Money QR
-- **Barcode & SKU Scanning**: Instant product lookup with fast auto-cart add.
-- **📱 USSD Mobile Money QR**: Dynamic QR code generation for mobile payment services (**EVC Plus**, **Zaad**, **Sahal**). Encodes `*712*{merchantNumber}*{amount}#` with instant 1-tap phone dialer launch.
-- **Cart Management**: Hold & resume cart states, preset discount buttons (5%, 10%, 15%), cash change due calculator.
-- **Thermal Receipts & Tax Invoices**: Generate printable thermal receipts (`REC-XXXXXX`) and commercial tax invoices.
+## ◈ System Capabilities
 
-### 🏢 Multi-Tenant Architecture
-- **Automatic Workspace Scoping**: `1 Workspace = 1 Organization`. Seamless tenant isolation backed by custom `x-company-id` header binding and JWT tenancy scope.
-- **Multi-Branch Operations**: Assign employees, stock levels, and audit logs to specific store branches.
+| Module | Runtime behavior |
+| --- | --- |
+| **POS / Checkout** | Barcode and SKU lookup, held carts, discounts, change calculation, thermal receipts, tax invoices, and mobile-money QR flows for EVC Plus, Zaad, and Sahal. |
+| **Inventory Grid** | Stock thresholds, batch expiry tracking, adjustments, SKU management, and multi-warehouse allocation. |
+| **Tenant Core** | Organization-scoped data, branch assignment, tenant headers, and JWT tenancy binding. |
+| **People + Access** | Owner, Admin, Manager, and Cashier roles with granular permissions, invitations, attendance, sessions, and audit trails. |
+| **AI Operations** | Workspace-aware assistant surfaces and monthly reporting workflows. |
 
-### 🔐 Enterprise Security & RBAC
-- **Granular Permissions**: Role-based access hierarchy supporting `Owner`, `Admin`, `Manager`, and `Cashier`.
-- **Zero-Trust Backend**: Protected by JWT verification, Helmet security headers, rate limiting (300 req/15min), and strict CORS origin checks.
-- **Environment Isolation**: Zero hardcoded secrets—all credentials managed via secure environment variables.
+## ⟡ Interface Protocol
 
-### 📦 Inventory & Warehouse Control
-- **Real-Time Stock Auditing**: Live stock counts, low-stock threshold alerts, batch expiry tracking, and stock adjustment logs.
-- **Multi-Warehouse Allocation**: Track movement across multiple fulfillment centers.
+The interface is styled like a calm cyberpunk control deck: luminous signals, translucent surfaces, and feedback that arrives in milliseconds.
 
-### 👥 Team & Employee Management
-- **Instant Employee Invitations**: Secure tokenized invite links (`/invite/:token`) with automatic client-side offline resiliency when backend services undergo maintenance.
-- **Attendance & Audit Logs**: Detailed event streaming for logins, transaction refunds, stock adjustments, and profile updates.
-
----
-
-## 🎨 Responsive Design & Micro-Animations
-
-Gurey Group is engineered to look stunning on all display viewports—from **320px mobile devices to 4K ultra-wide monitors**.
-
-```
-📱 Mobile (320px - 640px)   ➔ Full-width drawer navigation + responsive scrollable tables
-📐 Tablet (768px - 1024px)  ➔ Collapsible sidebar + adaptive grid matrix
-💻 Desktop (1280px - 4K)    ➔ Fixed glass navigation + multi-column executive analytics
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  GUREY GROUP // COMMAND DECK                                 │
+│  ────────────────────────────────────────────────────────────  │
+│  [01] GLASS PANELS      depth without visual noise            │
+│  [02] SIGNAL MOTION     350ms route transitions               │
+│  [03] TACTILE INPUT     hover, press, focus, confirmation     │
+│  [04] RESPONSIVE GRID   320px mobile → 4K desktop             │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### ⚡ Micro-Animation System
-- **`glass-panel`**: Multi-layered backdrop blur (`backdrop-filter: blur(20px)`) with neumorphic highlights.
-- **`page-enter`**: Smooth 350ms cubic-bezier slide-up page transitions.
-- **`skeleton`**: Shimmering animated loaders for seamless content fetching states.
-- **`btn-micro`**: Tactile micro-scaling click responses (`scale-[1.02]` / `scale-[0.98]`).
-- **`qr-modal-card`**: Dynamic modal entrance with smooth backdrop blur overlay.
+### Motion language
 
-### ✦ Motion Principles
+- **Page transitions:** compact fade-and-rise movement keeps route changes legible.
+- **Micro-interactions:** controls use subtle scale, glow, and color feedback.
+- **Living surfaces:** glass panels, mesh gradients, shimmer loaders, and floating assistant states create depth.
+- **Responsive continuity:** mobile drawers and desktop navigation share the same interaction vocabulary.
 
-Every interaction is designed to feel light, immediate, and intentional:
-
-- **Soft entrances** — workspace views fade and rise into place without interrupting the user’s flow.
-- **Tactile controls** — buttons, cards, and navigation items respond with subtle scale and color feedback.
-- **Living surfaces** — glass panels, mesh gradients, shimmer loaders, and floating assistant states add depth without visual noise.
-- **Responsive continuity** — the same motion language carries from compact mobile drawers to wide desktop workspaces.
-
-The result is a calm, premium interface that communicates state through motion while keeping high-frequency POS workflows fast.
-
----
-
-## 🏗️ System Architecture
+## ⌁ Architecture Grid
 
 ```mermaid
-graph TD
-    User([📱 Customer / Cashier / Owner]) -->|HTTPS / WSS| FE[React + Vite Frontend]
-    FE -->|Bearer JWT + x-company-id| API[Express API Gateway]
-    
-    subgraph Security Layer
-        API --> RateLimit[Express Rate Limiter]
-        API --> Helmet[Helmet Security Headers]
-        API --> TenantIsolation[Tenant Isolation Middleware]
-    end
-
-    subgraph Data & Identity Layer
-        TenantIsolation -->|Auth Sync| Firebase[Firebase Auth & RTDB]
-        TenantIsolation -->|Multi-Tenant Scoped Queries| Mongo[(MongoDB Atlas)]
-    end
-
-    FE -->|Generate QR| USSD[USSD QR Generator *712*...]
+flowchart LR
+    U["Customer / Cashier / Owner"] --> F["React + Vite command deck"]
+    F -->|Bearer JWT + x-company-id| A["Express API gateway"]
+    A --> S["Security middleware"]
+    S --> I["Firebase identity"]
+    S --> D["MongoDB Atlas"]
+    F --> Q["USSD QR generator"]
 ```
 
----
+### Stack
 
-## 🛠️ Tech Stack
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 18.3, Vite, Tailwind CSS, Lucide React |
+| API | Node.js, Express 4, Mongoose |
+| Data | MongoDB Atlas with tenant-isolated collections |
+| Identity | Firebase Auth and RTDB |
+| Security | JWT, Helmet, rate limiting, strict CORS |
+| Payments | `qrcode.react` with mobile-money USSD payloads |
 
-| Domain | Technology | Description |
-| :--- | :--- | :--- |
-| **Frontend Framework** | React 18.3 | Modern functional component architecture with hooks |
-| **Styling & Design** | Tailwind CSS 3.4 | Glassmorphism, custom mesh gradients & animations |
-| **Icons** | Lucide React | Clean, modern vector icon suite |
-| **QR Code Engine** | `qrcode.react` | High-precision SVG QR code rendering |
-| **Backend Runtime** | Node.js + Express 4 | Modular API endpoints with tenant middleware |
-| **Database** | MongoDB Atlas | Mongoose ODM with tenant-isolated collections |
-| **Authentication** | Firebase Auth | Google OAuth 2.0 & Email/Password session state |
-| **Security** | Helmet, Rate-Limit, JWT | Complete API protection suite |
+## 🚀 Launch Sequence
 
----
+### Requirements
 
-## 🚀 Getting Started
+- Node.js `18.x` or newer
+- npm `9.x` or newer
+- MongoDB Atlas URI
+- Firebase Web project configuration
 
-### Prerequisites
-- **Node.js**: `v18.x` or higher
-- **npm**: `v9.x` or higher
-- **MongoDB Atlas** database URI
-- **Firebase** Web project config
+### 1. Clone and configure
 
-### 1. Clone Repository
 ```bash
 git clone https://github.com/uncannystranger/gureygroup.git
 cd gureygroup
-```
-
-### 2. Configure Environment Variables
-Copy `.env.example` to create your local `.env` file:
-```bash
 cp .env.example .env
 ```
 
-Fill in your database and Firebase keys in `.env`:
-```env
-# Database
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?appName=gureygroup
+Fill `.env` locally with your MongoDB, JWT, and Firebase values. Never commit `.env`.
 
-# JWT Secrets
-JWT_SECRET=your_super_secret_64_char_hex_key
-JWT_REFRESH_SECRET=your_super_secret_refresh_key
+### 2. Install dependencies
 
-# Firebase SDK
-VITE_FIREBASE_API_KEY=AIzaSy...
-VITE_FIREBASE_AUTH_DOMAIN=your-app.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-app-id
-```
-
-### 3. Install Dependencies
 ```bash
-# Install frontend dependencies
 npm install
-
-# Install backend dependencies
 cd backend && npm install && cd ..
 ```
 
-### 4. Run Development Servers
-```bash
-# Terminal 1: Start Backend API (Port 5000)
-cd backend
-npm run dev
+### 3. Start the local grid
 
-# Terminal 2: Start Frontend Application (Port 5173)
-npm run dev
+```bash
+# Terminal 1 — API server (default: http://127.0.0.1:5050)
+cd backend && npm run dev
+
+# Terminal 2 — Vite frontend (default: http://127.0.0.1:3000)
+npm run dev:frontend
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+The root `npm run dev` command starts both processes together.
 
----
+## 🛡 Security Signal
 
-## 🛡️ Security & Hardening
+- Secrets load from environment variables and are excluded by `.gitignore`.
+- JWT verification and tenant binding protect organization-scoped API access.
+- Helmet, rate limiting, strict CORS, and defensive error responses harden the API edge.
+- Backend migrations run during startup against the configured database.
 
-Gurey Group follows **Zero-Trust Security Principles**:
-- 🔒 **No Hardcoded Secrets**: Secrets are purged from source control and loaded runtime via `.env`.
-- 🔐 **Tenant Isolation**: Every database operation verifies the tenant ID (`req.tenantId`) parsed from cryptographically signed JWT tokens.
-- 🛡️ **Defensive Error Middleware**: Production API error responses suppress stack traces to prevent info leaks.
-- 🚫 **Secret Scanning Compliant**: Environment key patterns are strictly ignored via `.gitignore`.
+## ◇ Project Status
 
----
+This repository is the active Gurey Group SaaS workspace. Build the frontend with:
 
-## 📜 License
-
-Distributed under the **MIT License**. See `LICENSE` for more information.
-
----
+```bash
+npm run build
+```
 
 <div align="center">
+
+  <br />
   <sub>Made with 🧡 by <strong>uncannystranger</strong></sub>
+
 </div>
