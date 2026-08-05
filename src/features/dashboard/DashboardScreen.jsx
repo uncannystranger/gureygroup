@@ -125,7 +125,7 @@ export default function DashboardScreen({ onViewAllSales }) {
         <TotalInventoryCapsule />
 
         {/* Executive Commercial KPI Widget Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="glass-panel rounded-3xl p-4 relative overflow-hidden card-hover-lift">
             <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
               <span>{t('dashboard.total_revenue', 'Today Revenue')}</span>

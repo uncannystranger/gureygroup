@@ -78,6 +78,17 @@ export default function TeamManagementScreen() {
     }
   };
 
+  const handleRegenerateCode = async (inviteId) => {
+    try {
+      const result = await teamAPI.regenerateInvitationCode(inviteId);
+      setInvitations(prev => prev.map(invite => invite._id === inviteId
+        ? { ...invite, activationCode: result.activationCode }
+        : invite));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   // Revoke invitation
   const handleRevokeInvite = async (id) => {
     try {
@@ -135,14 +146,14 @@ export default function TeamManagementScreen() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center space-x-1 p-1 rounded-2xl bg-white/40 dark:bg-slate-800/40 border border-white/60 dark:border-white/5 w-fit">
+      <div className="flex max-w-full items-center space-x-1 overflow-x-auto p-1 rounded-2xl bg-white/40 dark:bg-slate-800/40 border border-white/60 dark:border-white/5 w-fit">
         {tabs.map(tab => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex shrink-0 items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -227,9 +238,9 @@ export default function TeamManagementScreen() {
                 {filteredMembers.map((member) => (
                   <div
                     key={member.userId}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-white/60 dark:border-white/5 hover:bg-white/90 dark:hover:bg-slate-800/80 transition-all"
+                    className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-white/60 dark:border-white/5 hover:bg-white/90 dark:hover:bg-slate-800/80 transition-all"
                   >
-                    <div className="flex items-center space-x-3.5">
+                    <div className="flex min-w-0 flex-1 items-center space-x-3.5">
                       {member.photoURL ? (
                         <img src={member.photoURL} alt={member.displayName} className="w-11 h-11 rounded-full object-cover shadow-sm" />
                       ) : (
@@ -237,7 +248,7 @@ export default function TeamManagementScreen() {
                           {member.displayName?.charAt(0)?.toUpperCase() || '?'}
                         </div>
                       )}
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
                           {member.displayName}
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${getRoleBadgeColor(member.role)}`}>
@@ -247,7 +258,7 @@ export default function TeamManagementScreen() {
                             <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 text-[9px] font-black">YOU</span>
                           )}
                         </h4>
-                        <p className="text-[11px] font-medium text-slate-400">{member.email}</p>
+                        <p className="max-w-full truncate text-[11px] font-medium text-slate-400">{member.email}</p>
                       </div>
                     </div>
 
@@ -334,9 +345,11 @@ export default function TeamManagementScreen() {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-slate-900 dark:text-white">{invite.email}</h4>
-                      <p className="text-[11px] text-slate-400">
+                        <p className="text-[11px] text-slate-400">
                         Role: {invite.role} • Invited by {invite.invitedByName}
-                      </p>
+                        </p>
+                        <p className="text-[10px] text-slate-400">Created {new Date(invite.createdAt).toLocaleDateString()} • Expires {new Date(invite.expiresAt).toLocaleDateString()}</p>
+                        {invite.status === 'pending' && <p className="text-[11px] font-black tracking-widest text-amber-500">Code: {invite.activationCode}</p>}
                     </div>
                   </div>
 
@@ -350,12 +363,15 @@ export default function TeamManagementScreen() {
                     </span>
 
                     {invite.status === 'pending' && hasPermission(PERMISSIONS.TEAM_INVITE) && (
-                      <button
-                        onClick={() => handleRevokeInvite(invite._id)}
-                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleRegenerateCode(invite._id)} className="px-2 py-1.5 rounded-lg text-[10px] font-bold text-indigo-400 hover:bg-indigo-500/10 transition-colors">Regenerate</button>
+                        <button
+                          onClick={() => handleRevokeInvite(invite._id)}
+                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

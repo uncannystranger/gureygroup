@@ -4,8 +4,11 @@ import User from '../models/User.js';
 import Company from '../models/Company.js';
 import Organization from '../models/Organization.js';
 import Membership from '../models/Membership.js';
+import Invitation from '../models/Invitation.js';
 import Audit from '../models/Audit.js';
+import EmployeeMember from '../models/EmployeeMember.js';
 import { enforceTenantIsolation, JWT_SECRET } from '../middleware/auth.js';
+import { getPermissionsForRole } from '../rbac/permissions.js';
 
 const router = express.Router();
 
@@ -23,6 +26,13 @@ router.post('/google', async (req, res) => {
 
     let user = await User.findOne({ email: email.toLowerCase() });
     let company;
+
+    // Employee credentials belong to the isolated employee flow. Never allow
+    // an invited employee email to be provisioned as a new owner via Firebase.
+    const employeeAccount = await EmployeeMember.findOne({ email: email.toLowerCase() });
+    if (employeeAccount && !user) {
+      return res.status(403).json({ error: 'This email is an employee account. Please use Employee Login.' });
+    }
 
     if (!user) {
       // 1 Gmail = 1 Company Rule
@@ -42,7 +52,7 @@ router.post('/google', async (req, res) => {
         photoURL: photoURL || '',
         companyId: newCompanyId,
         role: 'Owner',
-        permissions: ['ALL']
+        permissions: getPermissionsForRole('Owner')
       });
 
       await Organization.findOneAndUpdate(
@@ -66,7 +76,7 @@ router.post('/google', async (req, res) => {
           companyId: newCompanyId,
           userId: firebaseUid,
           role: 'Owner',
-          permissions: ['ALL'],
+          permissions: getPermissionsForRole('Owner'),
           status: 'active',
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -79,18 +89,13 @@ router.post('/google', async (req, res) => {
         details: `Created new SaaS workspace for companyId: ${newCompanyId}`
       });
     } else {
-      company = await Company.findOne({ companyId: user.companyId });
-      await Membership.findOneAndUpdate(
-        { companyId: user.companyId, userId: user.firebaseUid },
-        {
-          companyId: user.companyId,
-          userId: user.firebaseUid,
-          role: user.role,
-          permissions: user.permissions || [],
-          status: 'active',
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
+      const activeMembership = await Membership.findOne({ userId: user.firebaseUid, status: 'active' }).sort({ updatedAt: -1 });
+      if (activeMembership) {
+        user.companyId = activeMembership.companyId;
+        user.role = activeMembership.role;
+      }
+      company = await Company.findOne({ companyId: user.companyId })
+        || await Organization.findOne({ companyId: user.companyId });
       // Sync photoURL from Firebase Auth if user doesn't have a custom one yet
       if (photoURL && (!user.photoURL || user.photoURL === '')) {
         user.photoURL = photoURL;
@@ -99,8 +104,21 @@ router.post('/google', async (req, res) => {
       await user.save();
     }
 
+    const membership = await Membership.findOne({
+      userId: user.firebaseUid,
+      companyId: user.companyId,
+      status: 'active',
+    });
+
     const token = jwt.sign(
-      { uid: user.firebaseUid, email: user.email, companyId: user.companyId, role: user.role },
+      {
+        uid: user.firebaseUid,
+        email: user.email,
+        accountType: 'owner',
+        companyId: membership?.companyId || user.companyId,
+        role: membership?.role || user.role,
+        permissions: membership?.permissions || user.permissions || [],
+      },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -112,8 +130,10 @@ router.post('/google', async (req, res) => {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        role: user.role,
-        companyId: user.companyId
+        accountType: 'owner',
+        role: membership?.role || user.role,
+        permissions: membership?.permissions || user.permissions || [],
+        companyId: membership?.companyId || user.companyId
       },
       company
     });
@@ -128,18 +148,24 @@ router.post('/google', async (req, res) => {
  * GET /api/auth/me
  * Fetch current authenticated user & company context
  */
-router.get('/me', async (req, res) => {
+router.get('/me', enforceTenantIsolation, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+    const { uid, companyId } = req.user;
+    const user = await User.findOne({ firebaseUid: uid })
+      || await EmployeeMember.findOne({ employeeId: uid });
+    const membership = await Membership.findOne({
+      userId: uid,
+      companyId,
+      status: 'active',
+    });
+    const company = await Company.findOne({ companyId })
+      || await Organization.findOne({ companyId });
 
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!user || !membership || !company) {
+      return res.status(404).json({ error: 'Authenticated workspace could not be resolved.' });
+    }
 
-    const user = await User.findOne({ email: decoded.email });
-    const company = await Company.findOne({ companyId: decoded.companyId });
-
-    res.json({ user, company });
+    res.json({ user, company, membership });
   } catch (error) {
     res.status(401).json({ error: 'Session expired or invalid' });
   }

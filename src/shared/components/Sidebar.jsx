@@ -9,7 +9,6 @@ import {
   GitBranch,
   Activity,
   Monitor,
-  Settings,
   X,
   Sparkles,
   Sun,
@@ -23,26 +22,28 @@ import { useLanguage } from '../../localization/LanguageContext';
 import { useUserProfile } from '../../core/user/UserProfileContext';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useAuth } from '../../core/auth/AuthContext';
+import { useRBAC } from '../../core/rbac/RBACContext';
+import { PERMISSIONS } from '../../core/rbac/permissions';
 
-export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobileOpen }) {
+export default function Sidebar({ activeTab, setActiveTab, onOpenProfile, mobileOpen, setMobileOpen }) {
   const { activePreset, darkMode, setThemeMode, themeMode } = useTheme();
   const { t, language, setLanguage } = useLanguage();
   const { profile } = useUserProfile();
   const { branches, activeBranchId, setActiveBranchId } = useMultiTenant();
   const { logout } = useAuth();
+  const { hasPermission } = useRBAC();
 
   const navItems = [
     { id: 'general', labelKey: 'nav.dashboard', defaultLabel: 'Dashboard', icon: Building2 },
-    { id: 'sales', labelKey: 'nav.sales', defaultLabel: 'POS Terminal', icon: ShoppingCart },
-    { id: 'products', labelKey: 'nav.products', defaultLabel: 'Products & Inventory', icon: Package },
-    { id: 'reports', labelKey: 'nav.reports', defaultLabel: 'Reports & Analytics', icon: FileText },
-    { id: 'users', labelKey: 'nav.users', defaultLabel: 'Team & Employees', icon: Users },
-    { id: 'attendance', labelKey: 'nav.attendance', defaultLabel: 'Attendance', icon: Clock },
-    { id: 'branches', labelKey: 'nav.branches', defaultLabel: 'Branch Management', icon: GitBranch },
-    { id: 'audit', labelKey: 'nav.audit', defaultLabel: 'Audit Logs', icon: Activity },
-    { id: 'sessions', labelKey: 'nav.sessions', defaultLabel: 'Active Sessions', icon: Monitor },
-    { id: 'settings', labelKey: 'nav.settings', defaultLabel: 'System Settings', icon: Settings },
-  ];
+    { id: 'sales', labelKey: 'nav.sales', defaultLabel: 'POS Terminal', icon: ShoppingCart, permission: PERMISSIONS.SALES_VIEW },
+    { id: 'products', labelKey: 'nav.products', defaultLabel: 'Products & Inventory', icon: Package, permission: PERMISSIONS.PRODUCTS_VIEW },
+    { id: 'reports', labelKey: 'nav.reports', defaultLabel: 'Reports & Analytics', icon: FileText, permission: PERMISSIONS.REPORTS_VIEW },
+    { id: 'users', labelKey: 'nav.users', defaultLabel: 'Team & Employees', icon: Users, permission: PERMISSIONS.TEAM_VIEW },
+    { id: 'attendance', labelKey: 'nav.attendance', defaultLabel: 'Attendance', icon: Clock, permission: PERMISSIONS.ATTENDANCE_VIEW_OWN },
+    { id: 'branches', labelKey: 'nav.branches', defaultLabel: 'Branch Management', icon: GitBranch, permission: PERMISSIONS.BRANCHES_VIEW_OWN },
+    { id: 'audit', labelKey: 'nav.audit', defaultLabel: 'Audit Logs', icon: Activity, permission: PERMISSIONS.AUDIT_VIEW },
+    { id: 'sessions', labelKey: 'nav.sessions', defaultLabel: 'Active Sessions', icon: Monitor, permission: PERMISSIONS.SESSIONS_VIEW },
+  ].filter(item => !item.permission || hasPermission(item.permission));
 
   // Close drawer on Escape key press
   useEffect(() => {
@@ -54,6 +55,13 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [mobileOpen, setMobileOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = originalOverflow; };
+  }, [mobileOpen]);
 
   const handleSelect = (id) => {
     setActiveTab(id);
@@ -117,7 +125,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
         aria-hidden="true"
       />
 
-      <aside className={`lg:hidden fixed top-0 left-0 bottom-0 w-80 max-w-[88vw] glass-panel bg-white/95 dark:bg-slate-900/95 border-r border-white/60 dark:border-white/10 z-50 p-5 flex flex-col justify-between shadow-2xl transition-transform duration-300 ease-out overflow-y-auto ${
+      <aside aria-hidden={!mobileOpen} className={`lg:hidden fixed top-0 left-0 bottom-0 w-80 max-w-[88vw] glass-panel bg-white/95 dark:bg-slate-900/95 border-r border-white/60 dark:border-white/10 z-50 p-5 flex flex-col justify-between shadow-2xl transition-transform duration-300 ease-out overflow-y-auto overscroll-contain ${
         mobileOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="space-y-4">
@@ -158,7 +166,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
               </div>
             </div>
             <button
-              onClick={() => handleSelect('profile')}
+              onClick={() => { setMobileOpen(false); onOpenProfile?.(); }}
               className="p-2 rounded-xl bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 hover:text-indigo-500 shadow-xs text-xs font-bold shrink-0"
               title="Edit Profile"
             >
@@ -242,5 +250,3 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, setMobile
     </>
   );
 }
-
-

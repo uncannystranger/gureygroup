@@ -67,8 +67,9 @@ const authLimiter = rateLimit({
   max: 15,
   message: { error: 'Security Protection: Too many login/authentication attempts from this IP. Please try again in 15 minutes.' }
 });
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/signup', authLimiter);
+app.use('/api/auth', authLimiter);
+app.use('/api/team/auth/employee-login', authLimiter);
+app.use('/api/team/invitations/accept', authLimiter);
 
 // General API Rate Limiter
 const apiLimiter = rateLimit({

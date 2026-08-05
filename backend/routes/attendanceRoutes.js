@@ -1,7 +1,7 @@
 import express from 'express';
 import Attendance from '../models/Attendance.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requireRole } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
@@ -10,7 +10,7 @@ router.use(enforceTenantIsolation);
  * POST /api/attendance/check-in
  * Employee checks in for the day.
  */
-router.post('/check-in', async (req, res) => {
+router.post('/check-in', requirePermission('attendance:check_in'), async (req, res) => {
   try {
     const { uid, email } = req.user;
     const companyId = req.tenantId;
@@ -106,7 +106,7 @@ router.post('/check-out', async (req, res) => {
  * GET /api/attendance/today
  * Get today's attendance for the entire organization (Owner/Admin/Manager).
  */
-router.get('/today', requireRole(['Owner', 'Admin', 'Manager']), async (req, res) => {
+router.get('/today', requirePermission('attendance:view_all'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const today = new Date().toISOString().split('T')[0];
@@ -154,7 +154,7 @@ router.get('/my', async (req, res) => {
  * GET /api/attendance/history
  * Get attendance history for the organization (Owner/Admin/Manager).
  */
-router.get('/history', requireRole(['Owner', 'Admin', 'Manager']), async (req, res) => {
+router.get('/history', requirePermission('attendance:view_all'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const { from, to, branchId, userId, limit } = req.query;

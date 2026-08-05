@@ -2,7 +2,9 @@ import express from 'express';
 import Branch from '../models/Branch.js';
 import Membership from '../models/Membership.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requireRole } from '../middleware/auth.js';
+import Product from '../models/Product.js';
+import Sale from '../models/Sale.js';
+import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
@@ -12,7 +14,7 @@ router.use(enforceTenantIsolation);
  * List branches for the organization.
  * Managers only see their assigned branch; Owner/Admin see all.
  */
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('branches:view_own'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const { uid } = req.user;
@@ -33,8 +35,18 @@ router.get('/', async (req, res) => {
 
     // Enrich with employee count
     const enriched = await Promise.all(branches.map(async (b) => {
-      const employeeCount = await Membership.countDocuments({ companyId, branchId: b._id.toString() });
-      return { ...b.toObject(), employeeCount };
+      const branchId = b._id.toString();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const [employeeCount, productCount, todaySales] = await Promise.all([
+        Membership.countDocuments({ companyId, branchId }),
+        Product.countDocuments({ companyId, branchId, isArchived: false }),
+        Sale.aggregate([
+          { $match: { companyId, branchId, createdAt: { $gte: today }, status: 'Completed' } },
+          { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+        ]),
+      ]);
+      return { ...b.toObject(), employeeCount, productCount, todaySales: todaySales[0]?.total || 0 };
     }));
 
     res.json({ branches: enriched });
@@ -48,7 +60,7 @@ router.get('/', async (req, res) => {
  * POST /api/branches
  * Create a new branch (Owner/Admin only).
  */
-router.post('/', requireRole(['Owner', 'Admin']), async (req, res) => {
+router.post('/', requirePermission('branches:manage'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const { name, code, address, city, phone, managerId, managerName } = req.body;
@@ -87,7 +99,7 @@ router.post('/', requireRole(['Owner', 'Admin']), async (req, res) => {
  * PATCH /api/branches/:id
  * Update a branch (Owner/Admin only).
  */
-router.patch('/:id', requireRole(['Owner', 'Admin']), async (req, res) => {
+router.patch('/:id', requirePermission('branches:manage'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, code, address, city, phone, managerId, managerName, status } = req.body;
@@ -102,7 +114,7 @@ router.patch('/:id', requireRole(['Owner', 'Admin']), async (req, res) => {
     if (managerName !== undefined) updates.managerName = managerName;
     if (status !== undefined) updates.status = status;
 
-    const branch = await Branch.findByIdAndUpdate(id, { $set: updates }, { new: true });
+    const branch = await Branch.findOneAndUpdate({ _id: id, companyId: req.tenantId }, { $set: updates }, { new: true });
     if (!branch) {
       return res.status(404).json({ error: 'Branch not found.' });
     }
@@ -125,10 +137,10 @@ router.patch('/:id', requireRole(['Owner', 'Admin']), async (req, res) => {
  * DELETE /api/branches/:id
  * Deactivate a branch (Owner only).
  */
-router.delete('/:id', requireRole(['Owner']), async (req, res) => {
+router.delete('/:id', requirePermission('branches:manage'), async (req, res) => {
   try {
     const { id } = req.params;
-    const branch = await Branch.findByIdAndUpdate(id, { status: 'inactive' }, { new: true });
+    const branch = await Branch.findOneAndUpdate({ _id: id, companyId: req.tenantId }, { status: 'inactive' }, { new: true });
 
     if (!branch) {
       return res.status(404).json({ error: 'Branch not found.' });

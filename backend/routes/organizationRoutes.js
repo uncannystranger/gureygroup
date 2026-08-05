@@ -4,7 +4,8 @@ import Membership from '../models/Membership.js';
 import Branch from '../models/Branch.js';
 import User from '../models/User.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requireRole } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
+import { getPermissionsForRole } from '../rbac/permissions.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
@@ -57,7 +58,7 @@ router.post('/', async (req, res) => {
     // Update user record with companyId
     await User.findOneAndUpdate(
       { firebaseUid: uid },
-      { $set: { companyId, role: 'Owner', permissions: ['ALL'] } },
+      { $set: { companyId, role: 'Owner', permissions: getPermissionsForRole('Owner') } },
       { upsert: false }
     );
 
@@ -108,7 +109,7 @@ router.get('/me', async (req, res) => {
  * PATCH /api/organizations
  * Update organization settings (Owner/Admin only).
  */
-router.patch('/', requireRole(['Owner', 'Admin']), async (req, res) => {
+router.patch('/', requirePermission('settings:manage'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const ALLOWED_FIELDS = ['name', 'businessType', 'logo', 'country', 'currency',
@@ -147,7 +148,7 @@ router.patch('/', requireRole(['Owner', 'Admin']), async (req, res) => {
  * DELETE /api/organizations
  * Delete organization (Owner only — DANGER ZONE).
  */
-router.delete('/', requireRole(['Owner']), async (req, res) => {
+router.delete('/', requirePermission('org:delete'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     await Organization.findOneAndUpdate({ companyId }, { $set: { status: 'Deleted' } });

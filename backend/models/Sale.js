@@ -11,13 +11,14 @@ const saleItemSchema = new mongoose.Schema({
 
 const saleSchema = new mongoose.Schema({
   companyId: { type: String, required: true, index: true },
-  branchId: { type: String, default: null, index: true },
+  branchId: { type: String, required: true, index: true },
   branchName: { type: String, default: '' },
   posTerminalId: { type: String, default: '' },
   receiptNumber: { type: String, required: true },
   invoiceNumber: { type: String, required: true },
   cashierId: { type: String, required: true },
   cashierName: { type: String, required: true },
+  cashierRole: { type: String, default: '' },
   employeeId: { type: String, default: '' },
   customerName: { type: String, default: 'Walk-in Customer' },
   customerId: { type: String, default: null },
@@ -39,8 +40,8 @@ const saleSchema = new mongoose.Schema({
   timestamps: true
 });
 
-saleSchema.index({ companyId: 1, invoiceNumber: 1 }, { unique: true });
-saleSchema.index({ companyId: 1, receiptNumber: 1 }, { unique: true });
-saleSchema.index({ companyId: 1, createdAt: -1 });
+saleSchema.index({ companyId: 1, branchId: 1, invoiceNumber: 1 }, { unique: true });
+saleSchema.index({ companyId: 1, branchId: 1, receiptNumber: 1 }, { unique: true });
+saleSchema.index({ companyId: 1, branchId: 1, createdAt: -1 });
 
 export default mongoose.models.Sale || mongoose.model('Sale', saleSchema);

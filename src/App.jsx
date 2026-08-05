@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MultiTenantProvider } from './core/tenant/MultiTenantContext';
+import { BranchProvider } from './core/branch/BranchContext';
 import { ThemeProvider } from './core/theme/ThemeContext';
 import { UserProfileProvider } from './core/user/UserProfileContext';
 import { LanguageProvider } from './localization/LanguageContext';
@@ -25,17 +26,24 @@ import AuditLogScreen from './features/audit/AuditLogScreen';
 import SessionsScreen from './features/audit/SessionsScreen';
 import OrganizationSettingsScreen from './features/settings/OrganizationSettingsScreen';
 import AuthScreen from './features/auth/AuthScreen';
+import AcceptInvitationScreen from './features/auth/AcceptInvitationScreen';
 import VerifyEmailScreen from './features/auth/VerifyEmailScreen';
 import AiAssistantWidget from './features/ai_assistant/AiAssistantWidget';
 import { Sparkles } from 'lucide-react';
+import { useRBAC } from './core/rbac/RBACContext';
+import { PERMISSIONS } from './core/rbac/permissions';
+import EditProfileTab from './features/settings/components/EditProfileTab';
 
 
 function MainAppContent() {
-  const { isAuthenticated, isEmailVerified, authLoading } = useAuth();
+  const { isAuthenticated, isEmailVerified, authLoading, currentUser } = useAuth();
+  const { hasPermission } = useRBAC();
+  const inviteToken = window.location.pathname.match(/^\/invite\/([^/]+)$/)?.[1];
   const [activeTab, setActiveTab] = useState('general');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // Smooth exit: keep loader mounted briefly after authLoading resolves
   // so it can fade out without a hard cut
@@ -58,6 +66,15 @@ function MainAppContent() {
     return () => clearTimeout(loaderTimer.current);
   }, [authLoading]);
 
+  useEffect(() => {
+    if (!isProfileModalOpen) return undefined;
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setIsProfileModalOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isProfileModalOpen]);
+
   // Global Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -78,6 +95,10 @@ function MainAppContent() {
   }, []);
 
   // 1. Full-screen Loading State during Startup Auth Verification
+  if (inviteToken) {
+    return <AcceptInvitationScreen token={inviteToken} />;
+  }
+
   if (loaderVisible) {
     return (
       <div
@@ -114,7 +135,7 @@ function MainAppContent() {
   }
 
   // 3. Email Registration Verification Restriction Gateway
-  if (!isEmailVerified) {
+  if (!isEmailVerified && currentUser?.requiresEmailVerification !== false) {
     return <VerifyEmailScreen />;
   }
 
@@ -133,7 +154,25 @@ function MainAppContent() {
     return 'general';
   };
 
-  const currentSection = getMappedTab(activeTab);
+  const requestedSection = getMappedTab(activeTab);
+  const employeeDefault = currentUser?.accountType === 'employee'
+    ? (hasPermission(PERMISSIONS.SALES_VIEW) ? 'sales' : 'attendance')
+    : 'general';
+  const currentSection = currentUser?.accountType === 'employee' && requestedSection === 'general'
+    ? employeeDefault
+    : requestedSection;
+  const sectionPermissions = {
+    products: PERMISSIONS.PRODUCTS_VIEW,
+    sales: PERMISSIONS.SALES_VIEW,
+    reports: PERMISSIONS.REPORTS_VIEW,
+    users: PERMISSIONS.TEAM_VIEW,
+    attendance: PERMISSIONS.ATTENDANCE_VIEW_OWN,
+    branches: PERMISSIONS.BRANCHES_VIEW_OWN,
+    audit: PERMISSIONS.AUDIT_VIEW,
+    sessions: PERMISSIONS.SESSIONS_VIEW,
+    settings: PERMISSIONS.SETTINGS_VIEW,
+  };
+  const blockedSection = sectionPermissions[currentSection] && !hasPermission(sectionPermissions[currentSection]);
 
   return (
     <div className="min-h-screen flex bg-[#EBF0F7] dark:bg-[#0B0F17] text-slate-800 dark:text-slate-100 min-w-0">
@@ -142,6 +181,7 @@ function MainAppContent() {
       <Sidebar 
         activeTab={currentSection} 
         setActiveTab={setActiveTab} 
+        onOpenProfile={() => setIsProfileModalOpen(true)}
         mobileOpen={mobileNavOpen}
         setMobileOpen={setMobileNavOpen}
       />
@@ -152,6 +192,7 @@ function MainAppContent() {
         {/* Header with Search, Theme Toggle, Notification Bell & Mobile Menu Trigger */}
         <Header 
           setActiveTab={setActiveTab}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
           onOpenSearch={() => setIsSearchOpen(true)}
           currentTab={activeTab}
           onToggleMobileNav={() => setMobileNavOpen(prev => !prev)}
@@ -159,43 +200,52 @@ function MainAppContent() {
 
         {/* View Router */}
         <main key={currentSection} className="flex-1 mt-2 animate-page-transition">
-          {currentSection === 'general' && (
+          {blockedSection && (
+            <div className="glass-panel rounded-4xl p-8 text-center">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">403 Forbidden</h2>
+              <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Your role does not have access to this workspace section.
+              </p>
+            </div>
+          )}
+
+          {!blockedSection && currentSection === 'general' && (
             <DashboardScreen onViewAllSales={() => setActiveTab('sales')} />
           )}
 
-          {currentSection === 'products' && (
+          {!blockedSection && currentSection === 'products' && (
             <ProductsScreen onOpenAddProduct={() => setIsModalOpen(true)} />
           )}
 
-          {currentSection === 'sales' && (
+          {!blockedSection && currentSection === 'sales' && (
             <POSScreen />
           )}
 
-          {currentSection === 'reports' && (
+          {!blockedSection && currentSection === 'reports' && (
             <ReportsScreen />
           )}
 
-          {currentSection === 'users' && (
+          {!blockedSection && currentSection === 'users' && (
             <TeamManagementScreen />
           )}
 
-          {currentSection === 'attendance' && (
+          {!blockedSection && currentSection === 'attendance' && (
             <AttendanceScreen />
           )}
 
-          {currentSection === 'branches' && (
+          {!blockedSection && currentSection === 'branches' && (
             <BranchManagementScreen />
           )}
 
-          {currentSection === 'audit' && (
+          {!blockedSection && currentSection === 'audit' && (
             <AuditLogScreen />
           )}
 
-          {currentSection === 'sessions' && (
+          {!blockedSection && currentSection === 'sessions' && (
             <SessionsScreen />
           )}
 
-          {currentSection === 'settings' && (
+          {!blockedSection && currentSection === 'settings' && (
             activeTab === 'organization' 
               ? <OrganizationSettingsScreen />
               : <SettingsScreen initialTab={activeTab === 'profile' ? 'profile' : undefined} />
@@ -216,6 +266,41 @@ function MainAppContent() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {isProfileModalOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6 bg-slate-950/45 backdrop-blur-md animate-fade-in-up"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsProfileModalOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-profile-title"
+            className="relative w-full max-w-4xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto glass-panel rounded-[2rem] shadow-2xl animate-fade-scale"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between px-5 sm:px-7 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800">
+              <div>
+                <h2 id="edit-profile-title" className="text-base font-black text-slate-900 dark:text-white">Edit Profile</h2>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Update your personal details and profile image.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(false)}
+                className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-white/10 transition-colors btn-micro"
+                aria-label="Close edit profile dialog"
+              >
+                <span aria-hidden="true" className="text-xl leading-none">×</span>
+              </button>
+            </div>
+            <div className="p-4 sm:p-7">
+              <EditProfileTab />
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Floating Interactive AI Assistant with Micro-Animations & Monthly Report */}
       <AiAssistantWidget 
@@ -238,9 +323,11 @@ export default function App() {
         <AuthProvider>
           <UserProfileProvider>
             <MultiTenantProvider>
-              <RBACProvider>
-                <MainAppContent />
-              </RBACProvider>
+              <BranchProvider>
+                <RBACProvider>
+                  <MainAppContent />
+                </RBACProvider>
+              </BranchProvider>
             </MultiTenantProvider>
           </UserProfileProvider>
         </AuthProvider>

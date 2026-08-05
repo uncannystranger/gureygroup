@@ -1,16 +1,32 @@
 import React, { useState } from 'react';
-import { X, Mail, UserPlus, Copy, CheckCircle2, Building2, Shield, ChevronDown } from 'lucide-react';
-import { ROLE_LIST } from '../../core/rbac/permissions';
+import { Mail, UserPlus, Copy, CheckCircle2, Building2, Shield, ChevronDown, User, KeyRound } from 'lucide-react';
+import { PERMISSION_GROUPS, ROLE_LIST, ROLE_PERMISSIONS } from '../../core/rbac/permissions';
 import { teamAPI } from '../../services/apiService';
+import Modal from '../../shared/components/Modal';
 
 export default function InviteModal({ branches = [], onClose, onInviteSent }) {
   const [email, setEmail] = useState('');
+  const [employeeName, setEmployeeName] = useState('');
   const [role, setRole] = useState('Employee');
+  const [permissions, setPermissions] = useState(ROLE_PERMISSIONS.Employee || []);
   const [branchId, setBranchId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [inviteResult, setInviteResult] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  const handleRoleChange = (nextRole) => {
+    setRole(nextRole);
+    setPermissions(ROLE_PERMISSIONS[nextRole] || []);
+  };
+
+  const togglePermission = (permission) => {
+    setPermissions(prev => (
+      prev.includes(permission)
+        ? prev.filter(item => item !== permission)
+        : [...prev, permission]
+    ));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,7 +37,9 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
     try {
       const result = await teamAPI.createInvitation({
         email,
+        employeeName,
         role,
+        permissions,
         branchId: branchId || null,
       });
       setInviteResult(result);
@@ -53,7 +71,9 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
 
   const handleSendAnother = () => {
     setEmail('');
+    setEmployeeName('');
     setRole('Employee');
+    setPermissions(ROLE_PERMISSIONS.Employee || []);
     setBranchId('');
     setInviteResult(null);
     setError(null);
@@ -62,18 +82,14 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
   const availableRoles = ROLE_LIST.filter(r => r !== 'Owner');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl animate-fade-in">
-      <div className="w-full max-w-md glass-panel rounded-4xl p-6 sm:p-8 relative shadow-2xl border border-white/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/90">
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors">
-          <X className="w-5 h-5 text-slate-400" />
-        </button>
+    <Modal isOpen onClose={onClose} title="Invite Employee" className="max-w-3xl">
 
         <div className="flex items-center space-x-3 mb-6">
           <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
             <UserPlus className="w-5 h-5 text-indigo-500" />
           </div>
           <div>
-            <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Invite Employee</h3>
+            <h3 id="invite-employee-title" className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Invite Employee</h3>
             <p className="text-xs text-slate-400">Send an invitation link to join your organization</p>
           </div>
         </div>
@@ -98,6 +114,11 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
               </div>
               <p className="mt-2 text-[10px] text-slate-400">Share this link with the employee. Expires in 7 days.</p>
             </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Private Activation Code</label>
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"><KeyRound className="w-4 h-4 text-amber-500" /><span className="font-black tracking-[0.3em] text-lg text-slate-900 dark:text-white">{inviteResult.activationCode}</span></div>
+              <p className="mt-2 text-[10px] text-slate-400">Give this code to the employee separately. It is not sent by email.</p>
+            </div>
             <div className="flex items-center space-x-3 pt-2">
               <button onClick={handleSendAnother} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 text-xs font-bold hover:bg-indigo-500/20 transition-colors">Invite Another</button>
               <button onClick={onInviteSent} className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:scale-105 transition-all">Done</button>
@@ -105,6 +126,13 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Employee Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} placeholder="Optional name" className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Employee Email</label>
               <div className="relative">
@@ -116,7 +144,7 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Assigned Role</label>
               <div className="relative">
                 <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-white font-bold text-sm focus:outline-none appearance-none">
+                <select value={role} onChange={(e) => handleRoleChange(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-white font-bold text-sm focus:outline-none appearance-none">
                   {availableRoles.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -135,12 +163,29 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
                 </div>
               </div>
             )}
-            <button type="submit" disabled={loading || !email} className="w-full mt-2 px-5 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black text-sm shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center space-x-2">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Permissions</label>
+              <div className="max-h-56 overflow-y-auto rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 space-y-3">
+                {PERMISSION_GROUPS.map(group => (
+                  <div key={group.label}>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-indigo-500 mb-1">{group.label}</p>
+                    <div className="grid grid-cols-1 gap-1">
+                      {group.permissions.map(permission => (
+                        <label key={permission.key} className="flex items-center gap-2 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                          <input type="checkbox" checked={permissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} className="rounded border-slate-300 text-indigo-500 focus:ring-indigo-500" />
+                          <span>{permission.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2"><button type="button" onClick={onClose} className="px-5 py-3 rounded-2xl bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-black text-sm transition-colors hover:bg-slate-300 dark:hover:bg-slate-700">Cancel</button><button type="submit" disabled={loading || !email} className="px-5 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black text-sm shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center space-x-2">
               {loading ? <div className="w-4 h-4 rounded-full border-2 border-white/50 border-t-white animate-spin" /> : <><UserPlus className="w-4 h-4" /><span>Send Invitation</span></>}
-            </button>
+            </button></div>
           </form>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

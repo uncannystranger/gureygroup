@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Upload, Trash2, Star, ArrowLeft, ArrowRight, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
+import { Upload, Trash2, Star, ArrowLeft, ArrowRight, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
+import Modal from './Modal';
 
 export default function AddProductModal({ isOpen, onClose }) {
   const { addProduct, products } = useMultiTenant();
@@ -31,8 +32,6 @@ export default function AddProductModal({ isOpen, onClose }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState(null);
-
-  if (!isOpen) return null;
 
   // Image Upload Handlers
   const handleFiles = (files) => {
@@ -136,16 +135,7 @@ export default function AddProductModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-3xl glass-panel rounded-4xl p-6 sm:p-8 relative shadow-2xl border border-white/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 max-h-[90vh] overflow-y-auto animate-fade-scale">
-        
-        {/* Close Button */}
-        <button 
-          onClick={onClose}
-          className="absolute top-6 right-6 w-9 h-9 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors btn-micro"
-        >
-          <X className="w-4 h-4" />
-        </button>
+    <Modal isOpen={isOpen} onClose={onClose} title={t('products.add_product', 'Add New Product')}>
 
         {isSuccess ? (
           <div className="py-12 flex flex-col items-center text-center space-y-4 animate-fade-scale">
@@ -404,7 +394,6 @@ export default function AddProductModal({ isOpen, onClose }) {
           </form>
         )}
 
-      </div>
-    </div>
+    </Modal>
   );
 }

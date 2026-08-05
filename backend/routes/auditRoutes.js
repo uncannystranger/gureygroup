@@ -1,6 +1,6 @@
 import express from 'express';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requireRole } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
@@ -9,7 +9,7 @@ router.use(enforceTenantIsolation);
  * GET /api/audit
  * Fetch audit logs for the organization (Owner/Admin only).
  */
-router.get('/', requireRole(['Owner', 'Admin']), async (req, res) => {
+router.get('/', requirePermission('audit:view'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const { action, userEmail, from, to, limit, page } = req.query;
@@ -51,7 +51,7 @@ router.get('/', requireRole(['Owner', 'Admin']), async (req, res) => {
  * GET /api/audit/actions
  * List all distinct action types for filtering UI.
  */
-router.get('/actions', requireRole(['Owner', 'Admin']), async (req, res) => {
+router.get('/actions', requirePermission('audit:view'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const actions = await Audit.distinct('action', { companyId });

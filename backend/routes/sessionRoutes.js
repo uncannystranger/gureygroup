@@ -1,7 +1,7 @@
 import express from 'express';
 import Session from '../models/Session.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requireRole } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
@@ -120,7 +120,7 @@ router.post('/logout-other-devices', async (req, res) => {
  * GET /api/sessions/active
  * List currently active sessions for the org (Owner/Admin only).
  */
-router.get('/active', requireRole(['Owner', 'Admin']), async (req, res) => {
+router.get('/active', requirePermission('sessions:view'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const sessions = await Session.find({ companyId, isActive: true })
@@ -137,7 +137,7 @@ router.get('/active', requireRole(['Owner', 'Admin']), async (req, res) => {
  * DELETE /api/sessions/:id
  * Terminate a specific active session in the current organization.
  */
-router.delete('/:id', requireRole(['Owner', 'Admin']), async (req, res) => {
+router.delete('/:id', requirePermission('sessions:view'), async (req, res) => {
   try {
     const session = await Session.findOneAndUpdate(
       { _id: req.params.id, companyId: req.tenantId },
@@ -167,7 +167,7 @@ router.delete('/:id', requireRole(['Owner', 'Admin']), async (req, res) => {
  * GET /api/sessions/history
  * Session history for the org (Owner/Admin only).
  */
-router.get('/history', requireRole(['Owner', 'Admin']), async (req, res) => {
+router.get('/history', requirePermission('sessions:view'), async (req, res) => {
   try {
     const companyId = req.tenantId;
     const { userId, limit } = req.query;

@@ -13,17 +13,19 @@ const userSchema = new mongoose.Schema({
   address: { type: String, default: '' },
   dateOfBirth: { type: String, default: '' },
   gender: { type: String, default: '' },
+  pinHash: { type: String, default: '' },
+  securityPinHash: { type: String, default: '' },
   jobTitle: { type: String, default: 'Account Owner' },
   businessName: { type: String, default: '' },
   country: { type: String, default: '' },
   city: { type: String, default: '' },
 
-  // Organizational
-  companyId: { type: String, required: true, index: true },
+  // Default/last active workspace. Access is authorized through Membership.
+  companyId: { type: String, default: '', index: true },
   role: {
     type: String,
-    enum: ['Owner', 'Admin', 'Manager', 'Cashier', 'Inventory Staff', 'Accountant', 'Viewer'],
-    default: 'Owner'
+    enum: ['Owner', 'Admin', 'Manager', 'Cashier', 'Inventory Staff', 'Accountant', 'Viewer', 'Employee'],
+    default: 'Employee'
   },
   permissions: [{ type: String }],
   status: { type: String, enum: ['Active', 'Suspended', 'Pending'], default: 'Active' },

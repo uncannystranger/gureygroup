@@ -3,9 +3,11 @@ import { Building2, Plus, MapPin, Phone, User, Edit3, X, Users, CheckCircle2, Al
 import { useRBAC } from '../../core/rbac/RBACContext';
 import { PERMISSIONS } from '../../core/rbac/permissions';
 import { branchAPI, teamAPI } from '../../services/apiService';
+import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 
 export default function BranchManagementScreen() {
   const { hasPermission } = useRBAC();
+  const { refreshBranches } = useMultiTenant();
   const [branches, setBranches] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,7 @@ export default function BranchManagementScreen() {
       setEditingBranch(null);
       setFormData({ name: '', address: '', city: '', phone: '', managerId: '', managerName: '' });
       loadData();
+      refreshBranches().catch(() => {});
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       setError(err.message);

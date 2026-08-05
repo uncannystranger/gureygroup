@@ -136,7 +136,7 @@ export default function ReportsScreen() {
       </div>
 
       {/* Commercial Quick Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="glass-panel rounded-3xl p-4 card-hover-lift">
           <span className="text-[10px] font-extrabold uppercase text-slate-400">{t('dashboard.total_revenue', 'Total Sales Revenue')}</span>
           <p className="text-xl font-black text-slate-900 dark:text-white mt-1">
@@ -173,7 +173,7 @@ export default function ReportsScreen() {
       {/* Active Report View Canvas */}
       <div className="glass-panel rounded-4xl p-6 relative space-y-6 card-hover-lift">
         
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200/60 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/60 dark:border-slate-800">
           <div>
             <h3 className="text-base font-black text-slate-900 dark:text-white">
               Gurey Group {selectedReport} Statement ({dateRange})
@@ -182,7 +182,7 @@ export default function ReportsScreen() {
           </div>
           <button 
             onClick={handleExportCSV}
-            className="px-4 py-2 rounded-full glass-pill text-xs font-bold flex items-center gap-1.5 hover:scale-105 transition-all btn-micro"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded-full glass-pill text-xs font-bold flex items-center gap-1.5 hover:scale-105 transition-all btn-micro"
           >
             <Download className="w-4 h-4 text-emerald-500" /> {t('reports.export_csv', 'Export CSV File')}
           </button>

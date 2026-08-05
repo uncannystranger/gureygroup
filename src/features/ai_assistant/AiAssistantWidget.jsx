@@ -38,6 +38,15 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [assistantError, setAssistantError] = useState(null);
+  const [lastFailedPrompt, setLastFailedPrompt] = useState('');
+
+  const quickPrompts = [
+    "Show today's sales",
+    'Find low stock products',
+    'Summarize branch performance',
+    "Who are today's active employees?",
+    'Generate business report',
+  ];
 
   const { darkMode, setThemeMode } = useTheme();
   const chatEndRef = useRef(null);
@@ -190,6 +199,7 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
       const mapped = mapConversation(res.conversation);
       setChats(prev => prev.map(c => c.id === mapped.id ? mapped : c));
     } catch (error) {
+      setLastFailedPrompt(userText);
       setAssistantError(error.message || 'AI request failed.');
     } finally {
       setLoading(false);
@@ -266,7 +276,7 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
       />
 
       {/* Floating Widget Root */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end">
+      <div className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end">
         
         {/* Chat Drawer Window */}
         {isOpen && (
@@ -274,7 +284,7 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
             className={`glass-panel rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl flex flex-col transition-all duration-300 overflow-hidden mb-4 animate-scale-up ${
               isExpanded 
                 ? 'w-[92vw] max-w-4xl h-[82vh]' 
-                : 'w-[94vw] sm:w-[420px] h-[580px]'
+                : 'w-[calc(100vw-1.5rem)] sm:w-[420px] h-[min(580px,calc(100dvh-6rem))] sm:h-[580px]'
             }`}
           >
             {/* Top Header Bar */}
@@ -332,7 +342,7 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
               
               {/* AI Workspace Sidebar (Projects & Conversation History) */}
               {showSidebar && (
-                <div className="w-64 border-r border-slate-200/80 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-950/95 flex flex-col p-3 z-20 space-y-3 animate-fade-in text-xs">
+                <div className="absolute inset-y-0 left-0 w-[min(16rem,82vw)] border-r border-slate-200/80 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-950/95 flex flex-col p-3 z-20 space-y-3 animate-fade-in text-xs shadow-xl sm:static sm:w-64 sm:shadow-none">
                   
                   {/* New Chat Button */}
                   <button
@@ -461,6 +471,16 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
                 
                 {/* Scrollable Messages list */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scroll">
+                  {!activeMessages.length && !loading && (
+                    <div className="py-8 text-center animate-fade-in-up">
+                      <Sparkles className="w-8 h-8 mx-auto mb-3 text-indigo-500" />
+                      <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">Your business copilot is ready</p>
+                      <p className="text-xs text-slate-400 mt-1 mb-4">Ask about your permitted workspace facts.</p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {quickPrompts.map((prompt) => <button key={prompt} type="button" onClick={() => setInput(prompt)} className="px-3 py-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 text-[11px] font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/10 transition-all">{prompt}</button>)}
+                      </div>
+                    </div>
+                  )}
                   {activeMessages.map((msg) => (
                     <div 
                       key={msg.id}
@@ -525,10 +545,10 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
                 </div>
 
                 {/* Bottom Input Form */}
-                <form onSubmit={handleSend} className="p-3 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/90 flex items-center gap-2">
+                <form onSubmit={handleSend} className="relative p-3 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/90 flex items-center gap-2">
                   {assistantError && (
                     <div className="absolute left-4 right-4 bottom-[68px] rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] font-bold text-rose-500">
-                      {assistantError}
+                      <div className="flex items-center justify-between gap-3"><span>{assistantError.includes('temporarily unavailable') ? 'Assistant temporarily unavailable.' : assistantError}</span>{lastFailedPrompt && <button type="button" onClick={() => { setInput(lastFailedPrompt); setAssistantError(null); }} className="shrink-0 underline hover:no-underline">Retry</button>}</div>
                     </div>
                   )}
                   <input

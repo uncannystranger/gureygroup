@@ -17,6 +17,7 @@ export default function AuthScreen() {
   const { 
     loginWithGoogle, 
     loginWithEmail, 
+    loginAsEmployee,
     signupWithEmail, 
     resetPassword,
     authError, 
@@ -25,6 +26,7 @@ export default function AuthScreen() {
   } = useAuth();
 
   const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
+  const [loginType, setLoginType] = useState('owner');
   const [showPassword, setShowPassword] = useState(false);
 
   // Form Fields
@@ -51,6 +53,13 @@ export default function AuthScreen() {
     }
   };
 
+  const chooseLoginType = (type) => {
+    setLoginType(type);
+    setMode('login');
+    setAuthError(null);
+    setResetSent(false);
+  };
+
   // Simple password strength calculator (0 - 4)
   const calculatePasswordStrength = (pass) => {
     if (!pass) return 0;
@@ -74,6 +83,10 @@ export default function AuthScreen() {
     }
 
     if (mode === 'forgot') {
+      if (loginType === 'employee') {
+        triggerError('Employee password resets are handled by your workspace administrator. Please contact them to reset your access.');
+        return;
+      }
       try {
         await resetPassword(email);
         setResetSent(true);
@@ -105,7 +118,9 @@ export default function AuthScreen() {
       }
     } else {
       try {
-        await loginWithEmail(email, password);
+        await (loginType === 'employee'
+          ? loginAsEmployee(email, password)
+          : loginWithEmail(email, password));
       } catch (err) {
         triggerError(err.message);
       }
@@ -165,12 +180,12 @@ export default function AuthScreen() {
           {/* Card Subheader Title */}
           <div className="text-center mb-4">
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {mode === 'login' && 'Sign In to Workspace'}
+              {mode === 'login' && (loginType === 'employee' ? 'Employee Workspace Login' : 'Sign In to Workspace')}
               {mode === 'signup' && 'Create Business Account'}
               {mode === 'forgot' && 'Reset Password'}
             </h2>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-              {mode === 'login' && 'Enter your authorization credentials to proceed.'}
+              {mode === 'login' && (loginType === 'employee' ? 'Use the credentials created when you accepted your invitation.' : 'Enter your owner or administrator credentials to proceed.')}
               {mode === 'signup' && 'Provision your dedicated multi-tenant organization.'}
               {mode === 'forgot' && 'Enter your email to receive reset instructions.'}
             </p>
@@ -204,6 +219,17 @@ export default function AuthScreen() {
             </div>
           )}
 
+          {mode === 'login' && (
+            <div className="mb-4">
+              <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Login as</p>
+              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200/80 dark:border-slate-700/60">
+                <button type="button" onClick={() => chooseLoginType('owner')} className={`rounded-xl px-3 py-2 text-xs font-bold transition-all ${loginType === 'owner' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-600 dark:text-slate-400'}`}>Owner / Admin</button>
+                <button type="button" onClick={() => chooseLoginType('employee')} className={`rounded-xl px-3 py-2 text-xs font-bold transition-all ${loginType === 'employee' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-600 dark:text-slate-400'}`}>Employee</button>
+              </div>
+              {loginType === 'employee' && <p className="mt-2 text-[10px] text-indigo-600 dark:text-indigo-300 font-medium animate-fade-in">You will enter your assigned organization workspace with your role permissions.</p>}
+            </div>
+          )}
+
           {/* Error Banner */}
           {authError && (
             <div className="mb-4 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2 animate-fade-in-up">
@@ -224,7 +250,7 @@ export default function AuthScreen() {
           )}
 
           {/* Google OAuth Button */}
-          {mode !== 'forgot' && (
+          {mode !== 'forgot' && loginType === 'owner' && (
             <>
               <button
                 type="button"
@@ -303,7 +329,7 @@ export default function AuthScreen() {
             {/* Email Field */}
             <div>
               <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                Corporate Email
+                {loginType === 'employee' ? 'Employee Email' : 'Corporate Email'}
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
@@ -382,7 +408,7 @@ export default function AuthScreen() {
               ) : (
                 <>
                   <span>
-                    {mode === 'login' && 'Sign In to Workspace'}
+                    {mode === 'login' && (loginType === 'employee' ? 'Enter Employee Workspace' : 'Sign In to Workspace')}
                     {mode === 'signup' && 'Create Account'}
                     {mode === 'forgot' && 'Send Reset Link'}
                   </span>

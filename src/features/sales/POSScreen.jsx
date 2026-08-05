@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   ShoppingCart, 
   Search, 
@@ -21,6 +21,8 @@ import InvoiceModal from '../../shared/components/InvoiceModal';
 import HeldCartsModal from '../../shared/components/HeldCartsModal';
 import AddCustomerModal from '../../shared/components/AddCustomerModal';
 import QRPaymentModal from '../../shared/components/QRPaymentModal';
+import { useAuth } from '../../core/auth/AuthContext';
+import { useRBAC } from '../../core/rbac/RBACContext';
 
 function POSProductImageWithSkeleton({ src, alt }) {
   const [loaded, setLoaded] = useState(false);
@@ -49,10 +51,14 @@ export default function POSScreen() {
     addSale, 
     activeCompany, 
     customers, 
+    employees,
     heldCarts, 
     holdCart, 
     processRefund
   } = useMultiTenant();
+  const { currentUser } = useAuth();
+  const { isAtLeast } = useRBAC();
+  const canAssignCashier = isAtLeast('Manager');
 
   const { t, formatDate } = useLanguage();
 
@@ -63,6 +69,32 @@ export default function POSScreen() {
   const [paymentMethod, setPaymentMethod] = useState('Card');
   const [selectedCustomer, setSelectedCustomer] = useState(t('pos.walk_in', 'Walk-in Customer'));
   const [cashTendered, setCashTendered] = useState('');
+  const cashierStorageKey = `gurey_pos_cashier_${activeCompany?.id || 'default'}`;
+  const [cashierProfileName, setCashierProfileName] = useState(() => localStorage.getItem(cashierStorageKey) || '');
+  const [cashierNameInput, setCashierNameInput] = useState(() => localStorage.getItem(cashierStorageKey) || '');
+  const [cashierSaved, setCashierSaved] = useState(false);
+  const [selectedCashierId, setSelectedCashierId] = useState(currentUser?.uid || '');
+  const [cashierSettings] = useState(() => JSON.parse(localStorage.getItem('gurey_receipt_settings') || '{"showCashierName":true,"showEmployeeId":false,"showBranch":true,"showCashierRole":false}'));
+
+  const currentCashier = employees.find(e => e.id === selectedCashierId) || {
+    id: currentUser?.uid,
+    name: cashierProfileName || currentUser?.displayName || currentUser?.email || 'Current employee',
+    role: currentUser?.role || 'Employee',
+  };
+
+  useEffect(() => {
+    if (currentUser?.uid && !selectedCashierId) setSelectedCashierId(currentUser.uid);
+  }, [currentUser?.uid, selectedCashierId]);
+
+  const saveCashierProfile = () => {
+    const name = cashierNameInput.trim();
+    if (!name) return;
+    localStorage.setItem(cashierStorageKey, name);
+    setCashierProfileName(name);
+    setCashierNameInput(name);
+    setCashierSaved(true);
+    setTimeout(() => setCashierSaved(false), 1800);
+  };
 
   // Modals state
   const [isCompleted, setIsCompleted] = useState(false);
@@ -133,6 +165,8 @@ export default function POSScreen() {
       return alert(`Cash tendered ($${cashTenderedVal.toFixed(2)}) is less than total amount due ($${grandTotal.toFixed(2)})!`);
     }
 
+    if (!selectedCashierId) return alert('Select a cashier before completing the sale.');
+    if (selectedCashierId !== currentUser?.uid && !canAssignCashier) return alert('You are not allowed to assign another cashier.');
     const saleData = {
       customerName: selectedCustomer || t('pos.walk_in', 'Walk-in Customer'),
       items: cart.map(i => ({ productId: i.id, productName: i.name, quantity: i.quantity, price: i.sellingPrice, total: i.sellingPrice * i.quantity })),
@@ -141,7 +175,9 @@ export default function POSScreen() {
       tax: taxAmount,
       total: grandTotal,
       paymentMethod,
-      employeeName: 'Ahmed Cashier'
+      cashierId: currentCashier.id,
+      cashierName: currentCashier.name,
+      cashierRole: currentCashier.role,
     };
 
     try {
@@ -152,8 +188,10 @@ export default function POSScreen() {
         receiptNumber: savedSale.receiptNumber,
         invoiceNumber: savedSale.invoiceNumber,
         cashierName: savedSale.cashierName,
+        cashierRole: savedSale.cashierRole,
         employeeId: savedSale.employeeId,
         branchName: savedSale.branchName,
+        receiptSettings: cashierSettings,
         formattedDate: savedSale.formattedDate || 'Just now'
       });
     } catch (err) {
@@ -204,7 +242,7 @@ export default function POSScreen() {
     <div className="space-y-6 pb-12 page-enter">
       
       {/* Sub-Navigation Tabs for Sales Section */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10">
+      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10">
         {salesSubTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -227,12 +265,12 @@ export default function POSScreen() {
 
       {/* View 1: POS Terminal */}
       {activeSubTab === 'pos' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="responsive-page-grid grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Products Search & Selection Grid (7 Columns) */}
           <div className="lg:col-span-7 space-y-4">
             
-            <div className="p-4 rounded-3xl glass-panel border border-white/60 dark:border-white/10 flex items-center justify-between gap-4">
+            <div className="p-3 sm:p-4 rounded-3xl glass-panel border border-white/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -246,10 +284,10 @@ export default function POSScreen() {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex w-full sm:w-auto items-center space-x-2">
                 <button
                   onClick={() => setIsHeldModalOpen(true)}
-                  className="px-3.5 py-2 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-300 text-xs font-black flex items-center space-x-1.5 shadow-sm hover:scale-105 transition-all btn-micro"
+                  className="w-full sm:w-auto justify-center px-3.5 py-2.5 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-300 text-xs font-black flex items-center space-x-1.5 shadow-sm hover:scale-105 transition-all btn-micro"
                 >
                   <PauseCircle className="w-4 h-4" />
                   <span>{t('pos.held_carts', 'Held Carts')} ({heldCarts.length})</span>
@@ -258,7 +296,7 @@ export default function POSScreen() {
             </div>
 
             {/* Product Cards Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[68vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 min-[430px]:grid-cols-3 gap-3 sm:gap-4 max-h-[68vh] overflow-y-auto pr-1">
               {filteredProducts.length === 0 ? (
                 <div className="col-span-full py-16 text-center">
                   <ShoppingCart className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -271,14 +309,14 @@ export default function POSScreen() {
                     key={prod.id}
                     onClick={() => addToCart(prod)}
                     disabled={prod.quantity <= 0}
-                    className={`p-3 rounded-3xl glass-panel text-left flex flex-col justify-between h-44 hover:scale-[1.02] transition-all border border-white/60 dark:border-white/10 card-hover-lift animate-fade-in-up ${
+                    className={`min-w-0 p-3 rounded-3xl glass-panel text-left flex flex-col justify-between min-h-44 h-auto hover:scale-[1.02] transition-all border border-white/60 dark:border-white/10 card-hover-lift animate-fade-in-up ${
                       prod.quantity <= 0 ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
                     <div>
                       <POSProductImageWithSkeleton src={prod.images[0]} alt={prod.name} />
                       <h4 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">{prod.name}</h4>
-                      <p className="text-[10px] font-semibold text-slate-400">SKU: {prod.sku}</p>
+                      <p className="truncate text-[10px] font-semibold text-slate-400">SKU: {prod.sku}</p>
                     </div>
 
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-800">
@@ -293,7 +331,7 @@ export default function POSScreen() {
           </div>
 
           {/* POS Shopping Cart & Checkout Terminal (5 Columns) */}
-          <div className="lg:col-span-5 glass-panel rounded-4xl p-6 relative flex flex-col justify-between min-h-[75vh] card-hover-lift">
+          <div className="lg:col-span-5 glass-panel rounded-4xl p-4 sm:p-6 relative flex flex-col justify-between min-h-0 lg:min-h-[75vh] card-hover-lift">
             
             {isCompleted ? (
               <div className="my-auto text-center space-y-4 animate-fade-scale">
@@ -308,12 +346,12 @@ export default function POSScreen() {
                 <div>
                   
                   {/* Customer Selector & Order Header */}
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800">
-                    <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/60 dark:border-slate-800">
+                    <div className="flex min-w-0 flex-1 items-center space-x-2">
                       <select
                         value={selectedCustomer}
                         onChange={(e) => setSelectedCustomer(e.target.value)}
-                        className="px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                        className="min-w-0 flex-1 px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
                       >
                         <option value={t('pos.walk_in', 'Walk-in Customer')}>{t('pos.walk_in', 'Walk-in Customer')}</option>
                         {customers.map(c => (
@@ -338,6 +376,18 @@ export default function POSScreen() {
                     </button>
                   </div>
 
+                  <div className="mt-4 p-3 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 animate-fade-in-up">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-[11px] font-black text-indigo-700 dark:text-indigo-300">Cashier Name</label>
+                      <span className="text-[10px] font-bold text-slate-500">Current: {currentCashier.name}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input value={cashierNameInput} onChange={(e) => setCashierNameInput(e.target.value)} placeholder="Enter your name" className="min-w-0 flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500" />
+                      <button onClick={saveCashierProfile} disabled={!cashierNameInput.trim()} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black disabled:opacity-40 transition-all btn-micro">Save</button>
+                    </div>
+                    {cashierSaved && <p className="mt-2 text-[10px] font-bold text-emerald-600 animate-fade-in">Cashier profile saved for future POS sessions.</p>}
+                  </div>
+
                   {/* Cart Line Items */}
                   <div className="mt-4 space-y-3 max-h-56 overflow-y-auto pr-1">
                     {cart.length === 0 ? (
@@ -355,9 +405,9 @@ export default function POSScreen() {
                           </div>
 
                           <div className="flex items-center space-x-2">
-                            <button onClick={() => updateQuantity(item.id, -1)} className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700 text-xs font-bold flex items-center justify-center btn-micro">-</button>
+                            <button onClick={() => updateQuantity(item.id, -1)} className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 text-xs font-bold flex items-center justify-center btn-micro">-</button>
                             <span className="text-xs font-black text-slate-900 dark:text-white w-5 text-center">{item.quantity}</span>
-                            <button onClick={() => updateQuantity(item.id, 1)} className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700 text-xs font-bold flex items-center justify-center btn-micro">+</button>
+                            <button onClick={() => updateQuantity(item.id, 1)} className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 text-xs font-bold flex items-center justify-center btn-micro">+</button>
                           </div>
                         </div>
                       ))
@@ -409,7 +459,7 @@ export default function POSScreen() {
                   </div>
 
                   {/* Payment Method Selection */}
-                  <div className="grid grid-cols-3 gap-2 pt-1">
+                  <div className="grid grid-cols-2 min-[430px]:grid-cols-3 gap-2 pt-1">
                     {[
                       { id: 'Card', labelKey: 'pos.card', icon: CreditCard },
                       { id: 'Cash', labelKey: 'pos.cash', icon: DollarSign },

@@ -31,7 +31,7 @@ export function MultiTenantProvider({ children }) {
 
   const [branches, setBranches] = useState([]);
 
-  const [activeBranchId, setActiveBranchId] = useState(`branch_${activeCompanyId}`);
+  const [activeBranchId, setActiveBranchIdState] = useState(() => localStorage.getItem('gurey_active_branch_id') || '');
   const [warehouses, setWarehouses] = useState([]);
 
   // Isolated Collections - Default to EMPTY arrays for production user isolation
@@ -91,6 +91,9 @@ export function MultiTenantProvider({ children }) {
   const normalizeProduct = (product) => ({
     ...product,
     id: product._id || product.id,
+    name: product.name || '',
+    sku: product.sku || '',
+    barcode: product.barcode || '',
     quantity: product.quantity ?? product.stock ?? 0,
     lowStockLevel: product.lowStockLevel ?? product.minStockThreshold ?? 5,
     images: product.images || (product.primaryImage ? [product.primaryImage] : []),
@@ -103,6 +106,18 @@ export function MultiTenantProvider({ children }) {
     manager: branch.managerName || branch.manager || '',
   });
 
+  const refreshBranches = async () => {
+    const data = await branchAPI.list();
+    const nextBranches = (data.branches || []).map(normalizeBranch);
+    setBranches(nextBranches);
+    setActiveBranchIdState((current) => {
+      const saved = localStorage.getItem(`gurey_active_branch_${activeCompanyId}`);
+      const preferred = nextBranches.find((branch) => branch.id === current || branch.id === saved);
+      return preferred?.id || nextBranches.find((branch) => branch.isActive)?.id || '';
+    });
+    return nextBranches;
+  };
+
   // Re-sync state whenever activeCompanyId changes
   useEffect(() => {
     if (!currentUser?.uid) {
@@ -113,21 +128,29 @@ export function MultiTenantProvider({ children }) {
     }
 
     if (activeCompanyId) {
-      productAPI.list()
-        .then((data) => setProducts((Array.isArray(data) ? data : []).map(normalizeProduct)))
-        .catch((err) => {
-          console.warn('[MultiTenant] Failed to load products from backend:', err);
-          setProducts([]);
-        });
-
-      branchAPI.list()
-        .then((data) => setBranches((data.branches || []).map(normalizeBranch)))
+      refreshBranches()
         .catch((err) => {
           console.warn('[MultiTenant] Failed to load branches from backend:', err);
           setBranches([]);
         });
 
-      saleAPI.list({ limit: 250 })
+    }
+  }, [activeCompanyId, currentUser?.uid]);
+
+  // The selected branch is the data boundary for every branch-aware view.
+  useEffect(() => {
+    if (!activeCompanyId || !activeBranchId || !currentUser?.uid) return;
+    localStorage.setItem('gurey_active_branch_id', activeBranchId);
+    localStorage.setItem(`gurey_active_branch_${activeCompanyId}`, activeBranchId);
+
+    productAPI.list(activeBranchId)
+      .then((data) => setProducts((Array.isArray(data) ? data : []).map(normalizeProduct)))
+      .catch((err) => {
+        console.warn('[MultiTenant] Failed to load products from backend:', err);
+        setProducts([]);
+      });
+
+    saleAPI.list({ branchId: activeBranchId, limit: 250 })
         .then((data) => setSales((data.sales || []).map((sale) => ({
           ...sale,
           id: sale._id || sale.id,
@@ -138,30 +161,13 @@ export function MultiTenantProvider({ children }) {
         .catch((err) => {
           console.warn('[MultiTenant] Failed to load sales from backend:', err);
           setSales([]);
-        });
+      });
+  }, [activeCompanyId, activeBranchId, currentUser?.uid]);
 
-      const po = localStorage.getItem(`gurey_purchase_orders_${activeCompanyId}`);
-      setPurchaseOrders(po ? JSON.parse(po) : []);
-
-      const sup = localStorage.getItem(`gurey_suppliers_${activeCompanyId}`);
-      setSuppliers(sup ? JSON.parse(sup) : []);
-
-      const cust = localStorage.getItem(`gurey_customers_${activeCompanyId}`);
-      setCustomers(cust ? JSON.parse(cust) : []);
-
-      const act = localStorage.getItem(`gurey_activities_${activeCompanyId}`);
-      setActivities(act ? JSON.parse(act) : []);
-
-      const st = localStorage.getItem(`gurey_stock_adjustments_${activeCompanyId}`);
-      setStockAdjustments(st ? JSON.parse(st) : []);
-
-      const n = localStorage.getItem(`gurey_notifications_${activeCompanyId}`);
-      setNotifications(n ? JSON.parse(n) : []);
-
-      const hc = localStorage.getItem(`gurey_held_carts_${activeCompanyId}`);
-      setHeldCarts(hc ? JSON.parse(hc) : []);
-    }
-  }, [activeCompanyId, currentUser?.uid]);
+  const setActiveBranchId = (branchId) => {
+    if (!branches.some((branch) => branch.id === branchId && branch.isActive)) return;
+    setActiveBranchIdState(branchId);
+  };
 
   // Persist UI-only state that does not have backend routes yet.
   useEffect(() => {
@@ -180,8 +186,8 @@ export function MultiTenantProvider({ children }) {
   const activeBranch = branches.find(b => b.id === activeBranchId) || branches[0];
 
   // Scoped Data getters
-  const companyProducts = products.filter(p => p.companyId === activeCompanyId || !p.companyId);
-  const companySales = sales.filter(s => s.companyId === activeCompanyId || !s.companyId);
+  const companyProducts = products.filter(p => p.companyId === activeCompanyId && p.branchId === activeBranchId);
+  const companySales = sales.filter(s => s.companyId === activeCompanyId && s.branchId === activeBranchId);
   const companySuppliers = suppliers.filter(s => s.companyId === activeCompanyId || !s.companyId);
   const companyCustomers = customers.filter(c => c.companyId === activeCompanyId || !c.companyId);
   const companyEmployees = employees.filter(e => e.companyId === activeCompanyId || !e.companyId);
@@ -373,7 +379,9 @@ export function MultiTenantProvider({ children }) {
       branchId: activeBranchId,
       branchName: activeBranch?.name || '',
       posTerminalId: saleData.posTerminalId || 'web-pos',
+      cashierId: saleData.cashierId || currentUser?.uid,
       cashierName: saleData.cashierName || saleData.employeeName || currentUser?.displayName || currentUser?.email,
+      cashierRole: saleData.cashierRole || currentUser?.role || 'Employee',
       employeeId: saleData.employeeId || currentUser?.uid,
       totalAmount: saleData.total,
       taxRate: activeCompany?.taxRate || 0,
@@ -581,6 +589,7 @@ export function MultiTenantProvider({ children }) {
       activeBranch,
       activeBranchId,
       setActiveBranchId,
+      refreshBranches,
       warehouses,
       products: companyProducts,
       allProducts: products,

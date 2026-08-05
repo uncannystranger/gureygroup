@@ -73,7 +73,7 @@ export default function SettingsScreen({ initialTab }) {
       </div>
 
       {/* Logical Groups Nav Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 p-2 rounded-3xl glass-panel border border-white/60 dark:border-white/10">
+      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 p-2 rounded-3xl glass-panel border border-white/60 dark:border-white/10">
         {visibleGroups.map((group) => {
           const Icon = group.icon;
           const isActive = activeGroup === group.id;

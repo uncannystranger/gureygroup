@@ -6,7 +6,9 @@ const membershipSchema = new mongoose.Schema({
   role:           { type: String, required: true, default: 'Employee',
                     enum: ['Owner', 'Admin', 'Manager', 'Cashier', 'Inventory Staff', 'Employee'] },
   branchId:       { type: String, default: null },
-  permissions:    [{ type: String }],        // Optional per-user overrides
+  permissions:    [{ type: String }],
+  pinHash:        { type: String, default: '' },
+  securityPinHash:{ type: String, default: '' },
   status:         { type: String, enum: ['active', 'suspended', 'pending'], default: 'active' },
   joinedAt:       { type: Date, default: Date.now },
   invitedBy:      { type: String, default: null },

@@ -100,12 +100,12 @@ export default function SessionsScreen() {
               (activeTab === 'active' ? activeSessions : historySessions).map((session) => {
                 const DeviceIcon = getDeviceIcon(session.device);
                 return (
-                  <div key={session._id} className="flex items-center justify-between p-4 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-white/60 dark:border-white/5">
-                    <div className="flex items-center space-x-3">
+                  <div key={session._id} className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-white/60 dark:border-white/5">
+                    <div className="flex min-w-0 flex-1 items-center space-x-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${session.isActive ? 'bg-emerald-500/10' : 'bg-slate-500/10'}`}>
                         <DeviceIcon className={`w-5 h-5 ${session.isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
                           {session.userName || 'User'}
                           {session.isActive && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
@@ -115,7 +115,7 @@ export default function SessionsScreen() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right text-[11px]">
+                    <div className="max-w-full text-right text-[11px]">
                       <div className="font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1 justify-end">
                         <Clock className="w-3 h-3" />
                         {session.isActive ? `Active ${formatDate(session.lastActive)}` : `Logged out ${formatDate(session.logoutTime)}`}

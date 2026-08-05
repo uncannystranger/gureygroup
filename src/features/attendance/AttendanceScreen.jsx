@@ -213,11 +213,11 @@ export default function AttendanceScreen() {
 
       {/* Tabs */}
       {hasPermission(PERMISSIONS.ATTENDANCE_VIEW_ALL) && (
-        <div className="flex items-center space-x-1 p-1 rounded-2xl bg-white/40 dark:bg-slate-800/40 border border-white/60 dark:border-white/5 w-fit">
+        <div className="flex max-w-full items-center space-x-1 overflow-x-auto p-1 rounded-2xl bg-white/40 dark:bg-slate-800/40 border border-white/60 dark:border-white/5 w-fit">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex shrink-0 items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
                 <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
               </button>
@@ -250,10 +250,10 @@ export default function AttendanceScreen() {
           ) : (
             <div className="space-y-3">
               {todayRecords.map((record) => (
-                <div key={record._id || record.userId} className="flex items-center justify-between p-4 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-white/60 dark:border-white/5">
-                  <div className="flex items-center space-x-3">
+                <div key={record._id || record.userId} className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white/50 dark:bg-slate-800/40 border border-white/60 dark:border-white/5">
+                  <div className="flex min-w-0 flex-1 items-center space-x-3">
                     {getStatusIcon(record.status)}
-                    <div>
+                    <div className="min-w-0">
                       <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         {record.userName || 'Employee'}
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${getStatusBadge(record.status)}`}>
@@ -263,7 +263,7 @@ export default function AttendanceScreen() {
                       <p className="text-[11px] text-slate-400">{record.userRole || 'Employee'}</p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4 text-xs">
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
                     <div className="text-right">
                       <span className="block text-[10px] text-slate-400">In</span>
                       <span className="font-bold text-slate-700 dark:text-slate-200">{formatTime(record.checkIn)}</span>

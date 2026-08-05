@@ -3,8 +3,48 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    min-width: 320px;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-width: 320px;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  #root { min-height: 100dvh; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  img, svg, video, canvas { max-width: 100%; }
+
+  h1, h2, h3, h4, h5, h6, p, span, label, button, a {
+    overflow-wrap: anywhere;
+  }
+
+  button, input, select, textarea { max-width: 100%; }
+}
+
+/* Small screens use native-size form text to prevent Safari's focus zoom. */
+@media (max-width: 639px) {
+  input, select, textarea { font-size: 16px; }
+
+  .glass-panel {
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -436,6 +476,63 @@ html.theme-transition select {
   min-width: 540px;
 }
 
+/* Shared responsive primitives. Keep overflow inside the component rather
+   than allowing a wide child to widen the application viewport. */
+.responsive-table-wrapper { max-width: 100%; }
+.responsive-table-wrapper > table { width: max-content; max-width: none; }
+
+.modal-overlay {
+  overscroll-behavior: contain;
+  touch-action: manipulation;
+}
+
+/* Covers legacy popup shells that predate the shared Modal component. */
+.fixed.inset-0 { overscroll-behavior: contain; }
+
+@media (max-width: 1023px) {
+  .responsive-page-grid,
+  .responsive-page-grid[class*="grid-cols-"] { grid-template-columns: minmax(0, 1fr) !important; }
+
+  .responsive-page-grid > * { min-width: 0; }
+}
+
+@media (max-width: 639px) {
+  .responsive-table-wrapper table { min-width: 480px; }
+
+  .modal-overlay {
+    align-items: flex-start !important;
+    padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left)) !important;
+  }
+
+  .modal-overlay > [role="dialog"],
+  .modal-overlay > section {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 1.5rem) !important;
+    margin: auto 0;
+    padding: 1rem !important;
+  }
+
+  .fixed.inset-0 > section,
+  .fixed.inset-0 > div:not(.sidebar-backdrop) {
+    width: 100%;
+    max-width: calc(100vw - 1.5rem);
+    max-height: calc(100dvh - 1.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .mobile-stack,
+  .mobile-stack[class*="flex-row"] { flex-direction: column !important; align-items: stretch !important; }
+
+  .mobile-full { width: 100% !important; }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .modal-overlay > [role="dialog"],
+  .modal-overlay > section { max-width: min(42rem, calc(100vw - 2rem)); }
+}
+
 /* ------------------------------------------------------------------ */
 /* Floating Action Button (mobile FAB)                                  */
 /* ------------------------------------------------------------------ */
@@ -570,4 +667,3 @@ html.theme-transition select {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-

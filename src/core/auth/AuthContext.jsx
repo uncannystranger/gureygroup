@@ -13,9 +13,20 @@ import {
   onAuthStateChanged
 } from './firebase';
 import { loadUserProfile, getLocalCacheKey } from '../user/userProfileService';
-import { authAPI, sessionAPI } from '../../services/apiService';
+import { authAPI, sessionAPI, teamAPI } from '../../services/apiService';
 
 const AuthContext = createContext();
+
+const withFirebaseNetworkRetry = async (operation, retries = 2) => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error?.code !== 'auth/network-request-failed' || attempt >= retries) throw error;
+      await new Promise(resolve => setTimeout(resolve, 600 * (attempt + 1)));
+    }
+  }
+};
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
@@ -70,7 +81,9 @@ export function AuthProvider({ children }) {
       photoURL: synced.user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(synced.user.displayName || synced.user.email)}&background=6366F1&color=fff`,
       emailVerified: fbUser.emailVerified || false,
       role: synced.user.role,
-      companyId: synced.user.companyId
+      permissions: synced.user.permissions || [],
+      companyId: synced.user.companyId,
+      accountType: synced.user.accountType || 'owner'
     };
 
     localStorage.setItem('gurey_auth_token', synced.token);
@@ -163,6 +176,36 @@ export function AuthProvider({ children }) {
           setAuthError('Authentication service is unavailable. Please try again when the backend is reachable.');
         }
       } else {
+        const storedToken = localStorage.getItem('gurey_auth_token');
+        const storedUser = JSON.parse(localStorage.getItem('gurey_auth_user') || 'null');
+        if (storedUser?.authType === 'employee' && storedToken) {
+          try {
+            const session = await authAPI.me();
+            const membership = session.membership || {};
+            const backendUser = session.user || {};
+            const restoredUser = {
+              ...storedUser,
+              uid: backendUser.employeeId || backendUser.firebaseUid || storedUser.uid,
+              email: backendUser.email || storedUser.email,
+              displayName: backendUser.displayName || storedUser.displayName,
+              role: membership.role || storedUser.role,
+              permissions: membership.permissions || storedUser.permissions || [],
+              companyId: membership.companyId || storedUser.companyId,
+              emailVerified: true,
+              requiresEmailVerification: false,
+              authType: 'employee',
+            };
+            const company = normalizeBackendCompany(session.company);
+            setCurrentUser(restoredUser);
+            setTenantCompany(company);
+            localStorage.setItem('gurey_auth_user', JSON.stringify(restoredUser));
+            localStorage.setItem('gurey_tenant_company', JSON.stringify(company));
+            setAuthLoading(false);
+            return;
+          } catch (error) {
+            console.warn('[Auth] Employee session could not be restored:', error.message);
+          }
+        }
         // No active Firebase session — always clear state and stale localStorage
         setCurrentUser(null);
         setTenantCompany(null);
@@ -202,7 +245,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setAuthError(null);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await withFirebaseNetworkRetry(() => signInWithPopup(auth, googleProvider));
       const fbUser = result.user;
 
       const { user, company } = await syncBackendAuth(fbUser);
@@ -227,7 +270,12 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setAuthError(null);
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      let cred;
+      try {
+        cred = await withFirebaseNetworkRetry(() => signInWithEmailAndPassword(auth, email, password));
+      } catch (firebaseError) {
+        throw firebaseError;
+      }
       const fbUser = cred.user;
 
       try {
@@ -254,11 +302,36 @@ export function AuthProvider({ children }) {
         errMsg = 'Incorrect password. Please try again or reset your password.';
       } else if (err.code === 'auth/too-many-requests') {
         errMsg = 'Access disabled due to repeated failed attempts. Please reset your password or try again later.';
+      } else if (err.code === 'auth/network-request-failed') {
+        errMsg = 'Firebase could not reach the authentication service. Check your connection or browser network blocking and try again.';
       } else if (err.message) {
         errMsg = err.message;
       }
       setAuthError(errMsg);
       throw new Error(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginAsEmployee = async (email, password) => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      const employeeResult = await authAPI.employeeLogin({ email, password });
+      const company = normalizeBackendCompany(employeeResult.organization);
+      const user = { ...employeeResult.user, emailVerified: true, requiresEmailVerification: false, accountType: 'employee', authType: 'employee' };
+      localStorage.setItem('gurey_auth_token', employeeResult.token);
+      localStorage.setItem('gurey_auth_user', JSON.stringify(user));
+      localStorage.setItem('gurey_tenant_company', JSON.stringify(company));
+      localStorage.setItem('gurey_active_company', company?.id || user.companyId);
+      setCurrentUser(user);
+      setTenantCompany(company);
+      return { user, company };
+    } catch (err) {
+      const message = err.message || 'Unable to sign in to the employee workspace.';
+      setAuthError(message);
+      throw new Error(message);
     } finally {
       setLoading(false);
     }
@@ -382,6 +455,49 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const acceptInvitation = async ({ token, email, activationCode, fullName, password, pin }) => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      const result = await teamAPI.acceptInvitation(token, {
+        email, displayName: fullName || email.split('@')[0], photoURL: '',
+        activationCode, password,
+        pin: pin || '',
+      });
+
+      const companyObj = normalizeBackendCompany(result.organization);
+      const userObj = {
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoURL: result.user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(result.user.displayName || result.user.email)}&background=6366F1&color=fff`,
+        emailVerified: true,
+        accountType: 'employee',
+        authType: 'employee',
+        requiresEmailVerification: false,
+        role: result.user.role,
+        permissions: result.user.permissions || result.permissions || [],
+        companyId: result.user.companyId,
+      };
+
+      localStorage.setItem('gurey_auth_token', result.token);
+      localStorage.setItem('gurey_auth_user', JSON.stringify(userObj));
+      localStorage.setItem('gurey_tenant_company', JSON.stringify(companyObj));
+      localStorage.setItem('gurey_active_company', companyObj.id);
+      setCurrentUser(userObj);
+      setTenantCompany(companyObj);
+      return { user: userObj, company: companyObj };
+    } catch (err) {
+      const errMsg = err.code === 'auth/email-already-in-use'
+        ? 'This email already has an account. Sign in first, then reopen the invitation link.'
+        : (err.message || 'Failed to accept invitation.');
+      setAuthError(errMsg);
+      throw new Error(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 9. Production Logout (Destroy Session Completely)
   const logout = async () => {
     const uid = currentUser?.uid || auth.currentUser?.uid;
@@ -434,12 +550,14 @@ export function AuthProvider({ children }) {
       setAuthError,
       loginWithGoogle,
       loginWithEmail,
+      loginAsEmployee,
       signupWithEmail,
       resendVerificationEmail,
       changeUserEmail,
       checkEmailVerificationStatus,
       verifyOtpCode,
       resetPassword,
+      acceptInvitation,
       logout
     }}>
       {children}

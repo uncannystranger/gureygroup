@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const productSchema = new mongoose.Schema({
   companyId: { type: String, required: true, index: true },
+  branchId: { type: String, required: true, index: true },
   name: { type: String, required: true, trim: true },
   sku: { type: String, required: true },
   barcode: { type: String, default: '' },
@@ -24,7 +25,7 @@ const productSchema = new mongoose.Schema({
   timestamps: true
 });
 
-productSchema.index({ companyId: 1, sku: 1 }, { unique: true });
-productSchema.index({ companyId: 1, name: 'text', category: 'text' });
+productSchema.index({ companyId: 1, branchId: 1, sku: 1 }, { unique: true });
+productSchema.index({ companyId: 1, branchId: 1, name: 'text', category: 'text' });
 
 export default mongoose.models.Product || mongoose.model('Product', productSchema);

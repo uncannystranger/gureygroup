@@ -5,18 +5,21 @@ import Sale from '../models/Sale.js';
 import Product from '../models/Product.js';
 import Branch from '../models/Branch.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation } from '../middleware/auth.js';
+import Membership from '../models/Membership.js';
+import User from '../models/User.js';
+import EmployeeMember from '../models/EmployeeMember.js';
+import { enforceTenantIsolation, requirePermission, requireBranchAccess } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
 
 const makeNumber = (prefix) => `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('sales:view'), async (req, res) => {
   try {
-    const { branchId, limit = 100 } = req.query;
-    const filter = { companyId: req.tenantId };
-    if (branchId) filter.branchId = branchId;
+    const { limit = 100 } = req.query;
+    const branchId = await requireBranchAccess(req, req.query.branchId || req.headers['x-branch-id']);
+    const filter = { companyId: req.tenantId, branchId };
 
     const sales = await Sale.find(filter)
       .sort({ createdAt: -1 })
@@ -24,19 +27,19 @@ router.get('/', async (req, res) => {
 
     res.json({ sales });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch sales.' });
+    res.status(error.status || 500).json({ error: error.message || 'Failed to fetch sales.' });
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('sales:create'), async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const companyId = req.tenantId;
-    const branch = req.body.branchId
-      ? await Branch.findOne({ _id: req.body.branchId, companyId }).session(session)
-      : null;
+    const branchId = await requireBranchAccess(req, req.body.branchId || req.headers['x-branch-id']);
+    const branch = await Branch.findOne({ _id: branchId, companyId, status: 'active' }).session(session);
+    if (!branch) throw new Error('Selected branch is not active or no longer exists.');
 
     const items = (req.body.items || []).map((item) => ({
       productId: item.productId,
@@ -55,16 +58,38 @@ router.post('/', async (req, res) => {
     const receiptNumber = req.body.receiptNumber || makeNumber('REC');
     const invoiceNumber = req.body.invoiceNumber || makeNumber('INV');
 
+    const requestedCashierId = req.body.cashierId || req.user.uid;
+    const cashierMembership = await Membership.findOne({
+      userId: requestedCashierId,
+      companyId,
+      status: 'active',
+    }).session(session);
+    const canAssign = ['Owner', 'Admin', 'Manager'].includes(req.user.role) || req.user.permissions?.includes('sales:assign_cashier');
+    if (requestedCashierId !== req.user.uid && !canAssign) {
+      throw new Error('Forbidden: only managers can assign another cashier.');
+    }
+    if (!cashierMembership && requestedCashierId !== req.user.uid) {
+      throw new Error('Selected cashier is not an active employee in this organization.');
+    }
+    const cashierProfile = requestedCashierId === req.user.uid
+      ? null
+      : await User.findOne({ firebaseUid: requestedCashierId }).select('displayName email').session(session)
+        || await EmployeeMember.findOne({ employeeId: requestedCashierId, companyId, status: 'active' }).select('displayName email').session(session);
+    const cashier = requestedCashierId === req.user.uid
+      ? { id: req.user.uid, name: req.body.cashierName || req.user.displayName || req.user.email, role: req.user.role }
+      : { id: requestedCashierId, name: cashierProfile?.displayName || cashierProfile?.email || cashierMembership.email, role: cashierMembership.role };
+
     const sale = await Sale.create([{
       companyId,
-      branchId: req.body.branchId || null,
+      branchId,
       branchName: branch?.name || req.body.branchName || '',
       posTerminalId: req.body.posTerminalId || 'web-pos',
       receiptNumber,
       invoiceNumber,
-      cashierId: req.user.uid,
-      cashierName: req.body.cashierName || req.user.email,
-      employeeId: req.body.employeeId || req.user.uid,
+      cashierId: cashier.id,
+      cashierName: cashier.name,
+      cashierRole: cashier.role,
+      employeeId: req.body.employeeId || cashier.id,
       customerId: req.body.customerId || null,
       customerName: req.body.customerName || 'Walk-in Customer',
       customerPhone: req.body.customerPhone || '',
@@ -81,7 +106,7 @@ router.post('/', async (req, res) => {
 
     await Product.bulkWrite(items.map((item) => ({
       updateOne: {
-        filter: { _id: item.productId, companyId },
+        filter: { _id: item.productId, companyId, branchId },
         update: { $inc: { stock: -item.quantity } },
       },
     })), { session });

@@ -29,7 +29,7 @@ export default function OnboardingWizard({ isOpen, onComplete }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl animate-fade-in">
-      <div className="w-full max-w-xl glass-panel rounded-4xl p-6 sm:p-10 relative shadow-2xl border border-white/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/90">
+      <div className="w-full max-w-xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain glass-panel rounded-4xl p-6 sm:p-10 relative shadow-2xl border border-white/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/90">
         
         {/* Top Header & Step Progress Bar */}
         <div className="mb-6">

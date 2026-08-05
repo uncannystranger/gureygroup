@@ -50,13 +50,13 @@ export default function TotalInventoryCapsule() {
 
       {/* Signature 3 Connected Capsule Nodes */}
       <div className="mt-8 pt-4">
-        <div className="relative flex items-center justify-center sm:justify-start">
+        <div className="relative flex items-center justify-center sm:justify-start overflow-x-auto pb-1">
           
           {/* Interconnected Outer Liquid Glass Shell */}
-          <div className="inline-flex items-center p-2 rounded-full glass-panel border border-white/80 dark:border-white/10 shadow-lg relative bg-white/40 dark:bg-slate-900/40">
+          <div className="inline-flex min-w-max items-center p-2 rounded-full glass-panel border border-white/80 dark:border-white/10 shadow-lg relative bg-white/40 dark:bg-slate-900/40">
             
             {/* Left Node Capsule: In-Stock Valuation */}
-            <div className="px-6 py-4 rounded-full bg-white/60 dark:bg-slate-800/60 border border-white/60 dark:border-white/10 shadow-inner flex flex-col items-center justify-center min-w-[120px] transition-transform hover:scale-105 btn-micro">
+            <div className="px-3 sm:px-6 py-3 sm:py-4 rounded-full bg-white/60 dark:bg-slate-800/60 border border-white/60 dark:border-white/10 shadow-inner flex flex-col items-center justify-center min-w-[100px] sm:min-w-[120px] transition-transform hover:scale-105 btn-micro">
               <span className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">
                 $<AnimatedCounter value={(totalInventoryValue ?? 0) * 0.4} decimals={0} />
               </span>
@@ -66,7 +66,7 @@ export default function TotalInventoryCapsule() {
             </div>
 
             {/* Middle Node Capsule: Glowing Mesh Retail Potential Value */}
-            <div className="px-8 py-5 rounded-full capsule-mesh-gradient text-white flex flex-col items-center justify-center min-w-[150px] mx-1 sm:-mx-2 z-10 transition-transform hover:scale-105 shadow-pill-glow btn-micro">
+            <div className="px-4 sm:px-8 py-4 sm:py-5 rounded-full capsule-mesh-gradient text-white flex flex-col items-center justify-center min-w-[124px] sm:min-w-[150px] mx-1 sm:-mx-2 z-10 transition-transform hover:scale-105 shadow-pill-glow btn-micro">
               <span className="text-lg sm:text-xl font-black tracking-tight drop-shadow-sm">
                 $<AnimatedCounter value={totalRetailPotentialValue ?? 0} decimals={0} />
               </span>
@@ -76,7 +76,7 @@ export default function TotalInventoryCapsule() {
             </div>
 
             {/* Right Node Capsule: Warehouse Reserve */}
-            <div className="px-6 py-4 rounded-full bg-white/60 dark:bg-slate-800/60 border border-white/60 dark:border-white/10 shadow-inner flex flex-col items-center justify-center min-w-[120px] transition-transform hover:scale-105 btn-micro">
+            <div className="px-3 sm:px-6 py-3 sm:py-4 rounded-full bg-white/60 dark:bg-slate-800/60 border border-white/60 dark:border-white/10 shadow-inner flex flex-col items-center justify-center min-w-[100px] sm:min-w-[120px] transition-transform hover:scale-105 btn-micro">
               <span className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">
                 $<AnimatedCounter value={(totalInventoryValue ?? 0) * 0.6} decimals={0} />
               </span>

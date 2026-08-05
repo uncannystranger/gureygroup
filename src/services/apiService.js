@@ -41,6 +41,13 @@ function getHeaders() {
     }
   } catch (e) { /* ignore */ }
 
+  // Branch scope travels with every protected request. The API still verifies
+  // this value against the member's assignment; it is never trusted on its own.
+  try {
+    const branchId = localStorage.getItem('gurey_active_branch_id');
+    if (branchId) headers['x-branch-id'] = branchId;
+  } catch (e) { /* ignore */ }
+
   return headers;
 }
 
@@ -71,7 +78,10 @@ async function apiFetch(endpoint, options = {}) {
       if (response.status === 503 && data.error === 'Database unavailable') {
         throw new Error(data.message || 'Database unavailable. Check MongoDB Atlas network access/IP allowlist and MONGODB_URI.');
       }
-      throw new Error(data.message || data.error || `API error: ${response.status} ${response.statusText}`);
+      const apiError = new Error(data.message || data.error || `API error: ${response.status} ${response.statusText}`);
+      apiError.status = response.status;
+      apiError.code = data.code;
+      throw apiError;
     }
 
     return data;
@@ -86,6 +96,10 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 export const authAPI = {
+  employeeLogin: (data) => apiFetch('/team/auth/employee-login', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
   syncFirebaseUser: (data) => apiFetch('/auth/google', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -146,10 +160,11 @@ export const teamAPI = {
   }),
 
   revokeInvitation: (id) => apiFetch(`/team/invitations/${id}`, { method: 'DELETE' }),
+  regenerateInvitationCode: (id) => apiFetch(`/team/invitations/${id}/regenerate-code`, { method: 'POST' }),
 };
 
 export const productAPI = {
-  list: () => apiFetch('/products'),
+  list: (branchId) => apiFetch(`/products${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`),
 
   create: (data) => apiFetch('/products', {
     method: 'POST',

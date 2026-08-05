@@ -11,7 +11,7 @@ export default function NotificationToast() {
   if (unreadNotifs.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col space-y-2.5 max-w-sm w-full pointer-events-none">
+    <div className="fixed bottom-3 left-3 right-3 sm:bottom-5 sm:left-auto sm:right-5 z-50 flex flex-col space-y-2.5 max-w-sm w-auto sm:w-full pointer-events-none">
       {unreadNotifs.map((n) => {
         let Icon = Info;
         let borderClass = 'border-blue-500/40 bg-white/95 dark:bg-slate-900/95';

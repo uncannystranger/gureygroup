@@ -171,7 +171,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
       </div>
 
       {/* Merged Section Sub-Navigation Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10">
+      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10">
         {subTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;

@@ -34,16 +34,17 @@ export default function ReceiptModal({ isOpen, onClose, sale }) {
         <div id="printable-receipt" className="bg-amber-50/60 dark:bg-slate-950 p-5 rounded-3xl border border-amber-200/80 dark:border-slate-800 font-mono text-xs space-y-3 text-slate-800 dark:text-slate-200 shadow-inner">
           <div className="text-center space-y-1 pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
             <h2 className="font-extrabold text-sm uppercase tracking-widest text-slate-900 dark:text-white">Gurey Group</h2>
-            <p className="text-[10px] text-slate-500">{sale.branchName || 'Branch'} • POS {sale.posTerminalId || 'web-pos'}</p>
+            {sale.receiptSettings?.showBranch !== false && <p className="text-[10px] text-slate-500">{sale.branchName || 'Branch'} • POS {sale.posTerminalId || 'web-pos'}</p>}
             <div className="pt-1 text-[10px] font-bold text-indigo-500">{t('pos.receipt_preview', 'RECEIPT')}: {sale.receiptNumber}</div>
             <div className="text-[10px] font-bold text-slate-500">Invoice: {sale.invoiceNumber}</div>
           </div>
 
           <div className="flex justify-between text-[10px] text-slate-500">
             <span>{t('common.date', 'Date')}: {formatDate(sale.formattedDate || 'Today')}</span>
-            <span>Cashier: {sale.cashierName || sale.employeeName}</span>
+            {sale.receiptSettings?.showCashierName !== false && <span>Cashier: {sale.cashierName || sale.employeeName}</span>}
           </div>
-          <div className="text-[10px] text-slate-500">Employee ID: {sale.employeeId || sale.cashierId || 'N/A'}</div>
+          {sale.receiptSettings?.showEmployeeId && <div className="text-[10px] text-slate-500">Employee ID: {sale.employeeId || sale.cashierId || 'N/A'}</div>}
+          {sale.receiptSettings?.showCashierRole && <div className="text-[10px] text-slate-500">Role: {sale.cashierRole || 'Employee'}</div>}
           <div className="text-[10px] text-slate-500">{t('pos.select_customer', 'Customer')}: {sale.customerName || t('pos.walk_in', 'Walk-in Customer')}</div>
 
           {/* Line items table */}

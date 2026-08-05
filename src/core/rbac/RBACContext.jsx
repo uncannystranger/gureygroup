@@ -25,17 +25,28 @@ const RBACContext = createContext({
 
 export function RBACProvider({ children }) {
   const { currentUser } = useAuth();
+  const isEmployeeAccount = currentUser?.accountType === 'employee';
 
   // Derive role from the authenticated user — default to EMPLOYEE for safety
   const role = currentUser?.role || ROLES.EMPLOYEE;
 
-  // Memoize the permission set for the current role
-  const permissions = useMemo(() => getPermissionsForRole(role), [role]);
+  const permissions = useMemo(() => {
+    if (Array.isArray(currentUser?.permissions) && currentUser.permissions.length > 0) {
+      return currentUser.permissions;
+    }
+    return getPermissionsForRole(role);
+  }, [currentUser?.permissions, role]);
 
   // Check if the current user has a specific permission
   const hasPermission = useCallback(
-    (permission) => roleHasPermission(role, permission),
-    [role]
+    (permission) => {
+      // An employee may hold an operational role, but never receives owner
+      // administration access merely because that role is named "Admin".
+      const ownerOnly = ['org:edit', 'org:delete', 'org:manage_subscription', 'team:view', 'team:invite', 'team:remove', 'team:edit_roles', 'settings:view', 'settings:manage'];
+      if (isEmployeeAccount && ownerOnly.includes(permission)) return false;
+      return permissions.includes(permission) || roleHasPermission(role, permission);
+    },
+    [permissions, role, isEmployeeAccount]
   );
 
   // Check if user's role is at least the given level

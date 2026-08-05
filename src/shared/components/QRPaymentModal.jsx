@@ -52,7 +52,7 @@ export default function QRPaymentModal({ total, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xl animate-fade-in">
-      <div className="w-full max-w-sm glass-panel rounded-4xl p-6 sm:p-8 relative shadow-2xl border border-white/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 space-y-5">
+      <div className="w-full max-w-sm max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain glass-panel rounded-4xl p-6 sm:p-8 relative shadow-2xl border border-white/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 space-y-5">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -102,13 +102,13 @@ export default function QRPaymentModal({ total, onClose }) {
         {/* USSD String Display */}
         <div className="space-y-2">
           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">USSD Code</label>
-          <div className="flex items-center space-x-2">
-            <div className="flex-1 px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-sm font-black text-slate-900 dark:text-white tracking-wider text-center">
+          <div className="flex min-w-0 items-center space-x-2">
+            <div className="min-w-0 flex-1 break-all px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-sm font-black text-slate-900 dark:text-white tracking-wider text-center">
               {ussdString}
             </div>
             <button
               onClick={handleCopyUSSD}
-              className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`shrink-0 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 copied
                   ? 'bg-emerald-500 text-white'
                   : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-105'
