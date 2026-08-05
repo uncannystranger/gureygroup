@@ -34,6 +34,7 @@ import { useRBAC } from './core/rbac/RBACContext';
 import { PERMISSIONS } from './core/rbac/permissions';
 import EditProfileTab from './features/settings/components/EditProfileTab';
 
+const WATERMARK = 'Made with 🧡 by uncannystranger';
 
 function MainAppContent() {
   const { isAuthenticated, isEmailVerified, authLoading, currentUser } = useAuth();
@@ -251,6 +252,12 @@ function MainAppContent() {
               : <SettingsScreen initialTab={activeTab === 'profile' ? 'profile' : undefined} />
           )}
         </main>
+
+        <footer className="flex items-center justify-center py-4 text-[10px] font-semibold tracking-[0.16em] text-slate-400 dark:text-slate-500">
+          <span>{WATERMARK.replace('🧡', '')}</span>
+          <span className="mx-1 text-orange-500" aria-label="love">🧡</span>
+          <span>by uncannystranger</span>
+        </footer>
 
       </div>
 

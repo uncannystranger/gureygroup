@@ -27,6 +27,8 @@
   </div>
 
   <br />
+
+  <sub>Made with 🧡 by uncannystranger</sub>
 </div>
 
 ---
@@ -80,6 +82,17 @@ Gurey Group is engineered to look stunning on all display viewports—from **320
 - **`skeleton`**: Shimmering animated loaders for seamless content fetching states.
 - **`btn-micro`**: Tactile micro-scaling click responses (`scale-[1.02]` / `scale-[0.98]`).
 - **`qr-modal-card`**: Dynamic modal entrance with smooth backdrop blur overlay.
+
+### ✦ Motion Principles
+
+Every interaction is designed to feel light, immediate, and intentional:
+
+- **Soft entrances** — workspace views fade and rise into place without interrupting the user’s flow.
+- **Tactile controls** — buttons, cards, and navigation items respond with subtle scale and color feedback.
+- **Living surfaces** — glass panels, mesh gradients, shimmer loaders, and floating assistant states add depth without visual noise.
+- **Responsive continuity** — the same motion language carries from compact mobile drawers to wide desktop workspaces.
+
+The result is a calm, premium interface that communicates state through motion while keeping high-frequency POS workflows fast.
 
 ---
 
@@ -196,5 +209,5 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 ---
 
 <div align="center">
-  <sub>Built with ❤️ by the <strong>Gurey Group Engineering Team</strong></sub>
+  <sub>Made with 🧡 by <strong>uncannystranger</strong></sub>
 </div>

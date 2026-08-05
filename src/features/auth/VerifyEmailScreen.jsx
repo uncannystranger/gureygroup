@@ -290,7 +290,7 @@ export default function VerifyEmailScreen() {
 
       {/* Footer */}
       <footer className="w-full text-center py-6 text-xs text-slate-400 dark:text-slate-600 z-10">
-        Enterprise SaaS Secure Authentication Architecture.
+        <span>Made with </span><span className="text-orange-500" aria-label="love">🧡</span><span> by uncannystranger</span>
       </footer>
 
     </div>

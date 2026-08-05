@@ -434,7 +434,7 @@ export default function AuthScreen() {
 
       {/* Clean Compact Footer */}
       <footer className="w-full text-center py-3 text-[10px] text-slate-500 dark:text-slate-500 font-medium z-10">
-        © 2026 Gurey Group Enterprise SaaS. All rights reserved.
+        <span>Made with </span><span className="text-orange-500" aria-label="love">🧡</span><span> by uncannystranger</span>
       </footer>
 
     </div>
