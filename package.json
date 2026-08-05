@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "dev:frontend": "vite --host 127.0.0.1",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:all": "npm run dev",
     "build": "vite build",
     "preview": "vite preview"
   },

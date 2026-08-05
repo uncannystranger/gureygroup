@@ -22,8 +22,9 @@ export default function SettingsScreen({ initialTab }) {
   const { activeCompany, activeCompanyId } = useMultiTenant();
   const { t } = useLanguage();
 
+  const isProfilePage = initialTab === 'profile';
   const [activeGroup, setActiveGroup] = useState(() => {
-    return initialTab || 'profile';
+    return isProfilePage ? 'profile' : 'preferences';
   });
 
   // Mobile Money merchant number — persisted to localStorage
@@ -40,12 +41,11 @@ export default function SettingsScreen({ initialTab }) {
 
   useEffect(() => {
     if (initialTab) {
-      setActiveGroup(initialTab);
+      setActiveGroup(initialTab === 'profile' ? 'profile' : initialTab);
     }
   }, [initialTab]);
 
   const settingGroups = [
-    { id: 'profile', labelKey: 'header.edit_profile', defaultName: 'Edit Profile', icon: User },
     { id: 'preferences', labelKey: 'settings.preferences_tab', defaultName: 'Preferences', icon: Sliders },
     { id: 'security', labelKey: 'settings.security_tab', defaultName: 'Security & Access', icon: Lock },
     { id: 'general', labelKey: 'settings.business_name', defaultName: 'Business Info', icon: Building2 },
@@ -53,6 +53,9 @@ export default function SettingsScreen({ initialTab }) {
     { id: 'system', labelKey: 'nav.settings', defaultName: 'System & Backup', icon: Database },
     { id: 'advanced', labelKey: 'nav.reports', defaultName: 'Advanced API', icon: Plug },
   ];
+  const visibleGroups = isProfilePage
+    ? [{ id: 'profile', labelKey: 'header.edit_profile', defaultName: 'Edit Profile', icon: User }]
+    : settingGroups;
 
   return (
     <div className="space-y-6 pb-12 page-enter">
@@ -63,13 +66,15 @@ export default function SettingsScreen({ initialTab }) {
           {t('settings.title', 'System & Store Settings')}
         </h2>
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-          {t('settings.subtitle', 'Configure store profile, language preferences, theme & security.')}
+          {isProfilePage
+            ? t('settings.profile_subtitle', 'Manage personal profile details only.')
+            : t('settings.subtitle', 'Configure theme, notifications, security, billing, subscription, organization, and system settings.')}
         </p>
       </div>
 
       {/* Logical Groups Nav Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 p-2 rounded-3xl glass-panel border border-white/60 dark:border-white/10">
-        {settingGroups.map((group) => {
+        {visibleGroups.map((group) => {
           const Icon = group.icon;
           const isActive = activeGroup === group.id;
           return (

@@ -26,8 +26,7 @@ import {
 } from 'lucide-react';
 import MonthlyReportModal from './MonthlyReportModal';
 import { useTheme } from '../../core/theme/ThemeContext';
-
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+import { aiAPI } from '../../services/apiService';
 
 
 export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
@@ -38,18 +37,15 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [assistantError, setAssistantError] = useState(null);
 
   const { darkMode, setThemeMode } = useTheme();
   const chatEndRef = useRef(null);
 
   // ─── Projects & Chat Storage ──────────────────────────────────────────────
-  const [projects, setProjects] = useState(() => {
-    const saved = localStorage.getItem('gurey_ai_projects');
-    return saved ? JSON.parse(saved) : [
-      { id: 'proj_default', name: 'General Operations', color: 'indigo' },
-      { id: 'proj_sales', name: 'Sales & Revenue Analysis', color: 'purple' }
-    ];
-  });
+  const [projects, setProjects] = useState([
+    { id: 'proj_default', name: 'General Operations', color: 'indigo' }
+  ]);
 
   const [activeProjectId, setActiveProjectId] = useState('proj_default');
   const [editingProjectId, setEditingProjectId] = useState(null);
@@ -57,48 +53,43 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
   const [newProjectName, setNewProjectName] = useState('');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
-  const [chats, setChats] = useState(() => {
-    const saved = localStorage.getItem('gurey_ai_chats');
-    if (saved) return JSON.parse(saved);
-    
-    return [
-      {
-        id: 'chat_init',
-        projectId: 'proj_default',
-        title: 'Welcome & System Overview',
-        timestamp: new Date().toISOString(),
-        messages: [
-          {
-            id: 'm1',
-            sender: 'ai',
-            text: "Hello! I am your Gurey Group Enterprise AI Assistant. How can I help you today?",
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            actionChips: [
-              { label: "📊 Generate Monthly Report", action: "TRIGGER_REPORT" },
-              { label: "🖥️ Open POS Terminal", action: "NAV_SALES" },
-              { label: "📦 Check Products & Stock", action: "NAV_PRODUCTS" }
-            ]
-          }
-        ]
-      }
-    ];
-  });
+  const [chats, setChats] = useState([]);
 
   const [activeChatId, setActiveChatId] = useState(() => {
-    return chats[0]?.id || 'chat_init';
+    return chats[0]?.id || null;
   });
 
-  // Save to localStorage whenever chats or projects change
   useEffect(() => {
-    localStorage.setItem('gurey_ai_projects', JSON.stringify(projects));
-  }, [projects]);
-
-  useEffect(() => {
-    localStorage.setItem('gurey_ai_chats', JSON.stringify(chats));
-  }, [chats]);
+    let mounted = true;
+    aiAPI.listConversations()
+      .then((res) => {
+        if (!mounted) return;
+        const mapped = (res.conversations || []).map(mapConversation);
+        setChats(mapped);
+        setActiveChatId(mapped[0]?.id || null);
+      })
+      .catch((err) => setAssistantError(err.message || 'Failed to load AI conversations.'));
+    return () => { mounted = false; };
+  }, []);
 
   const activeChat = chats.find(c => c.id === activeChatId) || chats[0];
   const activeMessages = activeChat ? activeChat.messages : [];
+
+  function mapConversation(conversation) {
+    return {
+      id: conversation._id,
+      projectId: 'proj_default',
+      title: conversation.title || 'New Conversation',
+      timestamp: conversation.updatedAt || conversation.createdAt,
+      pinned: !!conversation.pinned,
+      messages: (conversation.messages || []).map((message) => ({
+        id: message._id,
+        sender: message.role === 'assistant' ? 'ai' : 'user',
+        text: message.content,
+        timestamp: new Date(message.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      })),
+    };
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -153,96 +144,27 @@ export default function AiAssistantWidget({ setActiveTab, onOpenAddProduct }) {
     }));
   };
 
-  // ─── Natural Conversational Intent Detector ──────────────────────────────
-  const handleNaturalGreeting = (userPrompt) => {
-    const clean = userPrompt.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "");
-    
-    if (clean === "hi" || clean === "hello" || clean === "hey" || clean === "hi there" || clean === "greetings") {
-      return "Hello! How can I help you today?";
-    }
-    if (clean.includes("good morning")) {
-      return "Good morning! What can I assist you with today?";
-    }
-    if (clean.includes("good afternoon")) {
-      return "Good afternoon! How can I assist your operations today?";
-    }
-    if (clean.includes("good evening")) {
-      return "Good evening! How can I help you today?";
-    }
-    if (clean.includes("thank you") || clean === "thanks" || clean === "thx" || clean.includes("thank u")) {
-      return "You're welcome. Let me know if you need anything else.";
-    }
-    if (clean.includes("who are you") || clean.includes("what can you do")) {
-      return "I am your Gurey Group Enterprise AI Assistant. I can help answer questions regarding your sales, inventory, report generation, and execute system commands.";
-    }
-    if (clean === "how are you") {
-      return "I'm operating at peak performance! How may I assist you today?";
-    }
-
-    return null;
-  };
-
-  // ─── Gemini API Call ──────────────────────────────────────────────────────
-  const callGeminiApi = async (userPrompt) => {
-    // First check natural conversational greetings
-    const naturalReply = handleNaturalGreeting(userPrompt);
-    if (naturalReply) return naturalReply;
-
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-      
-      const systemInstruction = `You are Gurey Group Enterprise AI Assistant, a friendly, modern conversational assistant similar to ChatGPT, Gemini, or Claude.
-Respond naturally, helpfully, and concisely. Keep formatting clean.`;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `${systemInstruction}\n\nUser Question: ${userPrompt}` }]
-            }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Gemini API HTTP Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (reply) return reply;
-      throw new Error("No text response in Gemini payload.");
-    } catch (err) {
-      console.warn('[AI Assistant] Gemini API fetch warning, using natural response fallback:', err.message);
-      
-      const promptLower = userPrompt.toLowerCase();
-      if (promptLower.includes('report') || promptLower.includes('monthly')) {
-        setIsReportOpen(true);
-        return "I have opened the Monthly Intelligence Report for you! It covers total revenue ($142,850), completed orders (1,248), inventory warnings, and strategic recommendations.";
-      }
-      if (promptLower.includes('sale') || promptLower.includes('pos') || promptLower.includes('order')) {
-        if (setActiveTab) setActiveTab('sales');
-        return "Taking you directly to the Point of Sale (POS) Terminal.";
-      }
-      if (promptLower.includes('product') || promptLower.includes('stock') || promptLower.includes('inventory')) {
-        if (setActiveTab) setActiveTab('products');
-        return "Navigating to the Inventory and Product Catalog screen.";
-      }
-      
-      return `I understand. Regarding "${userPrompt}", everything in your Gurey Group workspace is running smoothly. How else can I assist you today?`;
-    }
-  };
-
   const handleSend = async (e) => {
     e?.preventDefault();
     if (!input.trim() || loading) return;
 
     const userText = input.trim();
     setInput('');
+    setAssistantError(null);
+
+    let conversationId = activeChatId;
+    if (!conversationId) {
+      try {
+        const created = await aiAPI.createConversation('New Conversation');
+        const mapped = mapConversation(created.conversation);
+        conversationId = mapped.id;
+        setChats(prev => [mapped, ...prev]);
+        setActiveChatId(conversationId);
+      } catch (err) {
+        setAssistantError(err.message || 'Failed to create conversation.');
+        return;
+      }
+    }
 
     // Append User Message to Active Chat
     const userMsg = {
@@ -253,7 +175,7 @@ Respond naturally, helpfully, and concisely. Keep formatting clean.`;
     };
 
     setChats(prev => prev.map(c => {
-      if (c.id === activeChatId) {
+      if (c.id === conversationId) {
         // Update title if it's the default title
         const newTitle = c.messages.length <= 1 ? userText.slice(0, 30) + '...' : c.title;
         return { ...c, title: newTitle, messages: [...c.messages, userMsg] };
@@ -264,40 +186,27 @@ Respond naturally, helpfully, and concisely. Keep formatting clean.`;
     setLoading(true);
 
     try {
-      const aiReply = await callGeminiApi(userText);
-      addAiMessage(aiReply);
+      const res = await aiAPI.sendMessage(conversationId, userText);
+      const mapped = mapConversation(res.conversation);
+      setChats(prev => prev.map(c => c.id === mapped.id ? mapped : c));
     } catch (error) {
-      addAiMessage("I'm here to help! Let me know if you need anything else.");
+      setAssistantError(error.message || 'AI request failed.');
     } finally {
       setLoading(false);
     }
   };
 
   // ─── Chat & Project Management Handlers ──────────────────────────────────
-  const startNewChat = (projId = activeProjectId) => {
-    const newChatId = `chat_${Date.now()}`;
-    const newChat = {
-      id: newChatId,
-      projectId: projId,
-      title: 'New Conversation',
-      timestamp: new Date().toISOString(),
-      messages: [
-        {
-          id: `m_start_${Date.now()}`,
-          sender: 'ai',
-          text: "Hello! How can I help you today?",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          actionChips: [
-            { label: "📊 Generate Monthly Report", action: "TRIGGER_REPORT" },
-            { label: "🖥️ Open POS Terminal", action: "NAV_SALES" }
-          ]
-        }
-      ]
-    };
-
-    setChats(prev => [newChat, ...prev]);
-    setActiveChatId(newChatId);
-    setShowSidebar(false);
+  const startNewChat = async () => {
+    try {
+      const res = await aiAPI.createConversation('New Conversation');
+      const newChat = mapConversation(res.conversation);
+      setChats(prev => [newChat, ...prev]);
+      setActiveChatId(newChat.id);
+      setShowSidebar(false);
+    } catch (err) {
+      setAssistantError(err.message || 'Failed to create conversation.');
+    }
   };
 
   const createProject = () => {
@@ -324,13 +233,18 @@ Respond naturally, helpfully, and concisely. Keep formatting clean.`;
     }
   };
 
-  const deleteChat = (chatId, e) => {
+  const deleteChat = async (chatId, e) => {
     e.stopPropagation();
     if (chats.length <= 1) return;
-    setChats(prev => prev.filter(c => c.id !== chatId));
-    if (activeChatId === chatId) {
-      const nextChat = chats.find(c => c.id !== chatId);
-      if (nextChat) setActiveChatId(nextChat.id);
+    try {
+      await aiAPI.deleteConversation(chatId);
+      setChats(prev => prev.filter(c => c.id !== chatId));
+      if (activeChatId === chatId) {
+        const nextChat = chats.find(c => c.id !== chatId);
+        if (nextChat) setActiveChatId(nextChat.id);
+      }
+    } catch (err) {
+      setAssistantError(err.message || 'Failed to delete conversation.');
     }
   };
 
@@ -612,6 +526,11 @@ Respond naturally, helpfully, and concisely. Keep formatting clean.`;
 
                 {/* Bottom Input Form */}
                 <form onSubmit={handleSend} className="p-3 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/90 flex items-center gap-2">
+                  {assistantError && (
+                    <div className="absolute left-4 right-4 bottom-[68px] rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] font-bold text-rose-500">
+                      {assistantError}
+                    </div>
+                  )}
                   <input
                     type="text"
                     value={input}

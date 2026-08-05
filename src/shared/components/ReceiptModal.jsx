@@ -1,5 +1,6 @@
 import React from 'react';
 import { Printer, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useLanguage } from '../../localization/LanguageContext';
 
 export default function ReceiptModal({ isOpen, onClose, sale }) {
@@ -10,6 +11,13 @@ export default function ReceiptModal({ isOpen, onClose, sale }) {
   const handlePrint = () => {
     window.print();
   };
+
+  const receiptPayload = JSON.stringify({
+    receiptNumber: sale.receiptNumber,
+    invoiceNumber: sale.invoiceNumber,
+    total: sale.total ?? sale.totalAmount,
+    paidAt: sale.date || sale.createdAt,
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
@@ -26,15 +34,16 @@ export default function ReceiptModal({ isOpen, onClose, sale }) {
         <div id="printable-receipt" className="bg-amber-50/60 dark:bg-slate-950 p-5 rounded-3xl border border-amber-200/80 dark:border-slate-800 font-mono text-xs space-y-3 text-slate-800 dark:text-slate-200 shadow-inner">
           <div className="text-center space-y-1 pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
             <h2 className="font-extrabold text-sm uppercase tracking-widest text-slate-900 dark:text-white">Gurey Group</h2>
-            <p className="text-[10px] text-slate-500">SoHo Flagship Store • NY 10012</p>
-            <p className="text-[10px] text-slate-500">TEL: +1 (212) 555-0192</p>
+            <p className="text-[10px] text-slate-500">{sale.branchName || 'Branch'} • POS {sale.posTerminalId || 'web-pos'}</p>
             <div className="pt-1 text-[10px] font-bold text-indigo-500">{t('pos.receipt_preview', 'RECEIPT')}: {sale.receiptNumber}</div>
+            <div className="text-[10px] font-bold text-slate-500">Invoice: {sale.invoiceNumber}</div>
           </div>
 
           <div className="flex justify-between text-[10px] text-slate-500">
             <span>{t('common.date', 'Date')}: {formatDate(sale.formattedDate || 'Today')}</span>
-            <span>Cashier: {sale.employeeName || 'Ahmed'}</span>
+            <span>Cashier: {sale.cashierName || sale.employeeName}</span>
           </div>
+          <div className="text-[10px] text-slate-500">Employee ID: {sale.employeeId || sale.cashierId || 'N/A'}</div>
           <div className="text-[10px] text-slate-500">{t('pos.select_customer', 'Customer')}: {sale.customerName || t('pos.walk_in', 'Walk-in Customer')}</div>
 
           {/* Line items table */}
@@ -43,9 +52,9 @@ export default function ReceiptModal({ isOpen, onClose, sale }) {
               <div key={idx} className="flex justify-between items-start text-[11px] animate-fade-in-up">
                 <div className="flex-1 pr-2">
                   <p className="font-bold line-clamp-1">{item.productName || item.name}</p>
-                  <p className="text-[10px] text-slate-400">{item.quantity} x ${item.price?.toFixed(2)}</p>
+                  <p className="text-[10px] text-slate-400">{item.quantity} x ${(item.price ?? item.unitPrice)?.toFixed(2)}</p>
                 </div>
-                <span className="font-extrabold">${(item.quantity * item.price)?.toFixed(2)}</span>
+                <span className="font-extrabold">${(item.total ?? item.totalPrice ?? (item.quantity * (item.price ?? item.unitPrice)))?.toFixed(2)}</span>
               </div>
             ))}
           </div>
@@ -63,12 +72,12 @@ export default function ReceiptModal({ isOpen, onClose, sale }) {
               </div>
             )}
             <div className="flex justify-between text-slate-500">
-              <span>{t('common.tax', 'Tax')} (8.5%):</span>
+              <span>{t('common.tax', 'Tax')} ({sale.taxRate || 0}%):</span>
               <span>${sale.tax?.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
               <span>{t('common.total', 'TOTAL')}:</span>
-              <span>${sale.total?.toFixed(2)}</span>
+              <span>${(sale.total ?? sale.totalAmount)?.toFixed(2)}</span>
             </div>
           </div>
 
@@ -78,8 +87,14 @@ export default function ReceiptModal({ isOpen, onClose, sale }) {
               {t('status.paid', 'PAID VIA')} {sale.paymentMethod?.toUpperCase()}
             </span>
             <p className="text-[9px] text-slate-400 italic">Thank you for shopping at Gurey Group!</p>
-            <div className="w-full text-center font-mono text-[10px] tracking-widest opacity-60">
-              ||| | |||| ||| |||| | ||| ||||
+            <div className="flex items-center justify-center pt-1">
+              <QRCodeSVG value={receiptPayload} size={70} bgColor="transparent" fgColor="currentColor" />
+            </div>
+            <div className="w-full text-center font-mono text-[10px] tracking-widest opacity-60 overflow-hidden">
+              *{sale.receiptNumber || sale.invoiceNumber}*
+            </div>
+            <div className="text-[9px] text-slate-400">
+              Returns require receipt and manager approval under company policy.
             </div>
           </div>
         </div>

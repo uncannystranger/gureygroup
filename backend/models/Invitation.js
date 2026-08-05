@@ -21,7 +21,6 @@ const invitationSchema = new mongoose.Schema({
 });
 
 invitationSchema.index({ companyId: 1, email: 1 });
-invitationSchema.index({ token: 1 });
 invitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL auto-cleanup
 
 /**

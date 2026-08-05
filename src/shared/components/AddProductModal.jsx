@@ -4,34 +4,33 @@ import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
 
 export default function AddProductModal({ isOpen, onClose }) {
-  const { addProduct } = useMultiTenant();
+  const { addProduct, products } = useMultiTenant();
   const { t } = useLanguage();
 
   const [formData, setFormData] = useState({
-    name: 'Premium Velvet Matte Lipstick',
-    sku: `SKU-${Math.floor(Math.random() * 9000 + 1000)}`,
-    barcode: `${Math.floor(Math.random() * 899999999999 + 100000000000)}`,
-    category: 'Makeup',
-    brand: 'Gurey Group',
-    supplierId: 'sup_luxe_cosmetics',
-    costPrice: '12.00',
-    sellingPrice: '35.00',
-    quantity: '50',
+    name: '',
+    sku: '',
+    barcode: '',
+    category: '',
+    brand: '',
+    supplierId: '',
+    costPrice: '',
+    sellingPrice: '',
+    quantity: '',
     unit: 'pcs',
-    lowStockLevel: '15',
-    reorderLevel: '30',
-    batchNumber: 'BT-2026-08',
-    expiryDate: '2028-08-01',
-    notes: 'Premium velvet matte formulation.'
+    lowStockLevel: '',
+    reorderLevel: '',
+    batchNumber: '',
+    expiryDate: '',
+    notes: ''
   });
 
   // Manual Multi-Image State
-  const [images, setImages] = useState([
-    { id: '1', url: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=400&q=80', isPrimary: true }
-  ]);
+  const [images, setImages] = useState([]);
   const [manualUrl, setManualUrl] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState(null);
 
   if (!isOpen) return null;
 
@@ -102,10 +101,11 @@ export default function AddProductModal({ isOpen, onClose }) {
     setImages(updated);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (images.length === 0) {
-      alert('Please upload at least one product image.');
+    setError(null);
+    if (!formData.name.trim() || !formData.sku.trim() || !formData.category.trim()) {
+      setError('Product name, SKU, and category are required.');
       return;
     }
 
@@ -114,21 +114,25 @@ export default function AddProductModal({ isOpen, onClose }) {
       ...images.filter(img => !img.isPrimary).map(img => img.url)
     ];
 
-    addProduct({
-      ...formData,
-      costPrice: parseFloat(formData.costPrice),
-      sellingPrice: parseFloat(formData.sellingPrice),
-      quantity: parseInt(formData.quantity, 10),
-      lowStockLevel: parseInt(formData.lowStockLevel, 10),
-      reorderLevel: parseInt(formData.reorderLevel, 10),
-      images: orderedImages
-    });
+    try {
+      await addProduct({
+        ...formData,
+        costPrice: parseFloat(formData.costPrice),
+        sellingPrice: parseFloat(formData.sellingPrice),
+        quantity: parseInt(formData.quantity, 10),
+        lowStockLevel: parseInt(formData.lowStockLevel, 10),
+        reorderLevel: parseInt(formData.reorderLevel, 10),
+        images: orderedImages
+      });
 
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsSuccess(false);
-      onClose();
-    }, 1500);
+      setIsSuccess(true);
+      setTimeout(() => {
+        setIsSuccess(false);
+        onClose();
+      }, 900);
+    } catch (err) {
+      setError(err.message || 'Failed to create product.');
+    }
   };
 
   return (
@@ -163,6 +167,12 @@ export default function AddProductModal({ isOpen, onClose }) {
                 {t('products.add_product', 'Add New Product')}
               </h3>
             </div>
+
+            {error && (
+              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold">
+                {error}
+              </div>
+            )}
 
             {/* MANUAL MULTI-IMAGE UPLOADER SECTION */}
             <div className="space-y-3 p-4 rounded-3xl bg-slate-100/70 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
@@ -314,16 +324,19 @@ export default function AddProductModal({ isOpen, onClose }) {
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">{t('products.category', 'Category')}</label>
-                <select
+                <input
+                  list="product-category-options"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-2xl bg-white/70 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold focus:outline-none"
-                >
-                  <option value="Makeup">Makeup</option>
-                  <option value="Skincare">Skincare</option>
-                  <option value="Fragrance">Fragrance</option>
-                  <option value="Haircare">Haircare</option>
-                </select>
+                  placeholder="Create or select a category"
+                  required
+                />
+                <datalist id="product-category-options">
+                  {Array.from(new Set((products || []).map(p => p.category).filter(Boolean))).map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </datalist>
               </div>
 
               <div>

@@ -2,6 +2,8 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Company from '../models/Company.js';
+import Organization from '../models/Organization.js';
+import Membership from '../models/Membership.js';
 import Audit from '../models/Audit.js';
 import { enforceTenantIsolation, JWT_SECRET } from '../middleware/auth.js';
 
@@ -43,6 +45,33 @@ router.post('/google', async (req, res) => {
         permissions: ['ALL']
       });
 
+      await Organization.findOneAndUpdate(
+        { companyId: newCompanyId },
+        {
+          companyId: newCompanyId,
+          name: company.name,
+          ownerId: firebaseUid,
+          ownerEmail: email.toLowerCase(),
+          currency: 'USD',
+          currencySymbol: '$',
+          timezone: 'UTC',
+          subscription: { plan: 'Enterprise', status: 'active' },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      await Membership.findOneAndUpdate(
+        { companyId: newCompanyId, userId: firebaseUid },
+        {
+          companyId: newCompanyId,
+          userId: firebaseUid,
+          role: 'Owner',
+          permissions: ['ALL'],
+          status: 'active',
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
       await Audit.create({
         companyId: newCompanyId,
         action: 'COMPANY_INITIALIZED',
@@ -51,6 +80,17 @@ router.post('/google', async (req, res) => {
       });
     } else {
       company = await Company.findOne({ companyId: user.companyId });
+      await Membership.findOneAndUpdate(
+        { companyId: user.companyId, userId: user.firebaseUid },
+        {
+          companyId: user.companyId,
+          userId: user.firebaseUid,
+          role: user.role,
+          permissions: user.permissions || [],
+          status: 'active',
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
       // Sync photoURL from Firebase Auth if user doesn't have a custom one yet
       if (photoURL && (!user.photoURL || user.photoURL === '')) {
         user.photoURL = photoURL;
@@ -119,7 +159,7 @@ router.patch('/profile', enforceTenantIsolation, async (req, res) => {
     // Allowed profile fields — prevent mass-assignment of sensitive fields
     const ALLOWED_FIELDS = [
       'displayName', 'firstName', 'lastName', 'photoURL',
-      'phone', 'jobTitle', 'businessName', 'country', 'city',
+      'phone', 'address', 'dateOfBirth', 'gender', 'jobTitle', 'businessName', 'country', 'city',
       'preferredLanguage', 'timezone', 'dateFormat', 'timeFormat',
       'currency', 'theme', 'accentColor', 'language',
       'emailNotifications', 'browserNotifications'

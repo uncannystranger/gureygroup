@@ -1,22 +1,21 @@
 /**
  * API Service — Central HTTP client for all backend API calls.
  * 
- * All requests include the JWT token from localStorage for authentication
- * and the x-company-id header for tenant scoping.
+ * All requests include the backend JWT token for authentication and the
+ * x-company-id header for tenant scoping.
  */
 
 const getApiBase = () => {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL.replace(/\/$/, '');
   if (typeof window !== 'undefined') {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'http://localhost:5000/api';
-    }
     return `${window.location.origin}/api`;
   }
   return '/api';
 };
 
 const API_BASE = getApiBase();
+
+export const getResolvedApiBase = () => API_BASE;
 
 
 /**
@@ -69,20 +68,36 @@ async function apiFetch(endpoint, options = {}) {
     }
 
     if (!response.ok) {
-      throw new Error(data.error || data.message || `API error: ${response.status} ${response.statusText}`);
+      if (response.status === 503 && data.error === 'Database unavailable') {
+        throw new Error(data.message || 'Database unavailable. Check MongoDB Atlas network access/IP allowlist and MONGODB_URI.');
+      }
+      throw new Error(data.message || data.error || `API error: ${response.status} ${response.statusText}`);
     }
 
     return data;
   } catch (err) {
-    // Catch browser network errors (e.g. Failed to fetch when backend server is down)
     if (err.name === 'TypeError' || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-      const customErr = new Error(`Backend server unreachable at ${url}. Please ensure backend API service is running on port 5000.`);
+      const customErr = new Error(`Backend API is unreachable at ${API_BASE}. Check VITE_API_URL or the development proxy/backend process.`);
       customErr.isNetworkError = true;
       throw customErr;
     }
     throw err;
   }
 }
+
+export const authAPI = {
+  syncFirebaseUser: (data) => apiFetch('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  me: () => apiFetch('/auth/me'),
+
+  updateProfile: (updates) => apiFetch('/auth/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  }),
+};
 
 // ─── Organization API ─────────────────────────────────────────────────────────
 
@@ -105,20 +120,7 @@ export const organizationAPI = {
 // ─── Team API ─────────────────────────────────────────────────────────────────
 
 export const teamAPI = {
-  getMembers: async () => {
-    try {
-      return await apiFetch('/team/members');
-    } catch (err) {
-      if (err.isNetworkError) {
-        // Fallback to local storage members if backend is offline
-        const company = JSON.parse(localStorage.getItem('gurey_tenant_company') || '{}');
-        const companyId = company.id || 'comp_default';
-        const localMembers = JSON.parse(localStorage.getItem(`gurey_employees_${companyId}`) || '[]');
-        return { members: localMembers, total: localMembers.length, isOffline: true };
-      }
-      throw err;
-    }
-  },
+  getMembers: () => apiFetch('/team/members'),
 
   updateMember: (userId, updates) => apiFetch(`/team/members/${userId}`, {
     method: 'PATCH',
@@ -129,65 +131,12 @@ export const teamAPI = {
     method: 'DELETE',
   }),
 
-  // Invitations with high-availability fallback
-  createInvitation: async (data) => {
-    try {
-      return await apiFetch('/team/invitations', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch (err) {
-      if (err.isNetworkError) {
-        // High-availability client fallback token generation
-        const company = JSON.parse(localStorage.getItem('gurey_tenant_company') || '{}');
-        const companyId = company.id || 'comp_default';
-        const user = JSON.parse(localStorage.getItem('gurey_auth_user') || '{}');
-        
-        const token = 'inv_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-        const inviteUrl = `${origin}/invite/${token}`;
+  createInvitation: (data) => apiFetch('/team/invitations', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 
-        const fallbackInvite = {
-          _id: 'inv_' + Date.now(),
-          companyId,
-          email: data.email.toLowerCase(),
-          role: data.role || 'Employee',
-          branchId: data.branchId || null,
-          token,
-          status: 'pending',
-          invitedByName: user.displayName || user.email || 'Owner',
-          createdAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        };
-
-        try {
-          const existing = JSON.parse(localStorage.getItem(`gurey_invitations_${companyId}`) || '[]');
-          localStorage.setItem(`gurey_invitations_${companyId}`, JSON.stringify([fallbackInvite, ...existing]));
-        } catch (e) {}
-
-        return {
-          invitation: fallbackInvite,
-          inviteUrl,
-          isOfflineFallback: true,
-        };
-      }
-      throw err;
-    }
-  },
-
-  getInvitations: async () => {
-    try {
-      return await apiFetch('/team/invitations');
-    } catch (err) {
-      if (err.isNetworkError) {
-        const company = JSON.parse(localStorage.getItem('gurey_tenant_company') || '{}');
-        const companyId = company.id || 'comp_default';
-        const localInvites = JSON.parse(localStorage.getItem(`gurey_invitations_${companyId}`) || '[]');
-        return { invitations: localInvites, isOffline: true };
-      }
-      throw err;
-    }
-  },
+  getInvitations: () => apiFetch('/team/invitations'),
 
   verifyInvitation: (token) => apiFetch(`/team/invitations/verify/${token}`),
 
@@ -196,21 +145,63 @@ export const teamAPI = {
     body: JSON.stringify(userData),
   }),
 
-  revokeInvitation: async (id) => {
-    try {
-      return await apiFetch(`/team/invitations/${id}`, { method: 'DELETE' });
-    } catch (err) {
-      if (err.isNetworkError) {
-        const company = JSON.parse(localStorage.getItem('gurey_tenant_company') || '{}');
-        const companyId = company.id || 'comp_default';
-        const localInvites = JSON.parse(localStorage.getItem(`gurey_invitations_${companyId}`) || '[]');
-        const updated = localInvites.filter(i => i._id !== id);
-        localStorage.setItem(`gurey_invitations_${companyId}`, JSON.stringify(updated));
-        return { success: true };
-      }
-      throw err;
-    }
+  revokeInvitation: (id) => apiFetch(`/team/invitations/${id}`, { method: 'DELETE' }),
+};
+
+export const productAPI = {
+  list: () => apiFetch('/products'),
+
+  create: (data) => apiFetch('/products', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  update: (id, updates) => apiFetch(`/products/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  }),
+
+  archive: (id) => apiFetch(`/products/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
+export const aiAPI = {
+  listConversations: () => apiFetch('/ai/conversations'),
+
+  createConversation: (title = 'New Conversation') => apiFetch('/ai/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  }),
+
+  sendMessage: (conversationId, content) => apiFetch(`/ai/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  }),
+
+  updateConversation: (conversationId, updates) => apiFetch(`/ai/conversations/${conversationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  }),
+
+  deleteConversation: (conversationId) => apiFetch(`/ai/conversations/${conversationId}`, {
+    method: 'DELETE',
+  }),
+};
+
+export const saleAPI = {
+  list: (options = {}) => {
+    const params = new URLSearchParams();
+    if (options.branchId) params.set('branchId', options.branchId);
+    if (options.limit) params.set('limit', options.limit);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return apiFetch(`/sales${suffix}`);
   },
+
+  create: (data) => apiFetch('/sales', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 };
 
 
@@ -306,6 +297,15 @@ export const sessionAPI = {
 
   getActive: () => apiFetch('/sessions/active'),
 
+  terminate: (sessionId) => apiFetch(`/sessions/${sessionId}`, {
+    method: 'DELETE',
+  }),
+
+  logoutOtherDevices: (currentSessionId) => apiFetch('/sessions/logout-other-devices', {
+    method: 'POST',
+    body: JSON.stringify({ currentSessionId }),
+  }),
+
   getHistory: (options = {}) => {
     const params = new URLSearchParams();
     if (options.userId) params.set('userId', options.userId);
@@ -315,6 +315,10 @@ export const sessionAPI = {
 };
 
 export default {
+  auth: authAPI,
+  product: productAPI,
+  ai: aiAPI,
+  sale: saleAPI,
   organization: organizationAPI,
   team: teamAPI,
   attendance: attendanceAPI,

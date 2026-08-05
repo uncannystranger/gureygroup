@@ -18,6 +18,7 @@ const productSchema = new mongoose.Schema({
   images: [{ type: String }],
   primaryImage: { type: String, default: '' },
   status: { type: String, enum: ['In Stock', 'Low Stock', 'Out of Stock'], default: 'In Stock' },
+  isArchived: { type: Boolean, default: false, index: true },
   createdBy: { type: String, default: 'System' }
 }, {
   timestamps: true

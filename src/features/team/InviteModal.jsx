@@ -84,20 +84,10 @@ export default function InviteModal({ branches = [], onClose, onInviteSent }) {
 
         {inviteResult ? (
           <div className="space-y-4">
-            {inviteResult?.isOfflineFallback ? (
-              <div className="flex items-start space-x-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-                <span className="text-amber-400 text-sm shrink-0">⚠️</span>
-                <div>
-                  <p className="text-xs font-black text-amber-400">Offline Mode — Backend unreachable</p>
-                  <p className="text-[10px] text-amber-400/80 mt-0.5">The invite link was generated locally. It will sync automatically once the backend server is back online.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                <span className="text-xs font-bold text-emerald-400">Invitation created successfully!</span>
-              </div>
-            )}
+            <div className="flex items-center space-x-2 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+              <span className="text-xs font-bold text-emerald-400">Invitation created successfully!</span>
+            </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Invitation Link</label>
               <div className="flex items-center space-x-2">

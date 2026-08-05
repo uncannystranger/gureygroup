@@ -3,10 +3,10 @@ import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
 import {
   loadUserProfile,
-  saveUserProfile,
   uploadProfileImage,
   getLocalCacheKey
 } from './userProfileService';
+import { authAPI } from '../../services/apiService';
 
 const UserProfileContext = createContext();
 
@@ -29,6 +29,9 @@ export function UserProfileProvider({ children }) {
       displayName: fullName,
       email: user?.email || 'user@example.com',
       phone: 'N/A',
+      address: '',
+      dateOfBirth: '',
+      gender: '',
       businessName: company?.name || `${first}'s Organization`,
       jobTitle: 'Account Owner',
       country: 'United States',
@@ -107,37 +110,35 @@ export function UserProfileProvider({ children }) {
       setProfileState(getDerivedProfile(currentUser, tenantCompany));
     }
 
-    // Step 2: Load from RTDB (authoritative) — overwrites cache
+    // Step 2: Load from backend API (authoritative) — overwrites cache
     isHydratingRef.current = true;
-    loadUserProfile(uid).then((dbData) => {
+    authAPI.me().then(({ user: backendUser }) => {
       isHydratingRef.current = false;
-      if (!dbData) return; // No RTDB doc yet — cache/derived data is fine
+      if (!backendUser) return;
 
       const merged = {
         ...getDerivedProfile(currentUser, tenantCompany),
-        ...dbData,
-        email: currentUser.email || dbData.email,
-        displayName: currentUser.displayName || dbData.displayName,
-        // Photo: RTDB stored URL takes precedence
-        photo: dbData.photoURL || dbData.photo || currentUser.photoURL
+        ...backendUser,
+        email: currentUser.email || backendUser.email,
+        displayName: backendUser.displayName || currentUser.displayName,
+        photo: backendUser.photoURL || currentUser.photoURL
           || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName || currentUser.email)}&background=6366F1&color=fff`
       };
 
       setProfileState(merged);
 
-      // Hydrate theme + accent from RTDB (database is source of truth)
-      if (dbData.theme && ['system', 'light', 'dark'].includes(dbData.theme)) {
-        setThemeMode(dbData.theme);
+      if (backendUser.theme && ['system', 'light', 'dark'].includes(backendUser.theme)) {
+        setThemeMode(backendUser.theme);
       }
-      if (dbData.accentColor) {
-        setAccentColor(dbData.accentColor);
+      if (backendUser.accentColor) {
+        setAccentColor(backendUser.accentColor);
       }
 
       // Update per-user localStorage cache with authoritative data
       localStorage.setItem(cacheKey, JSON.stringify(merged));
     }).catch((err) => {
       isHydratingRef.current = false;
-      console.warn('[UserProfileContext] RTDB hydration failed:', err);
+      console.warn('[UserProfileContext] Backend profile hydration failed:', err);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid]);
@@ -173,7 +174,7 @@ export function UserProfileProvider({ children }) {
   }, []);
 
   // -------------------------------------------------------------------
-  // saveProfile — writes to RTDB (authoritative) + localStorage cache
+  // saveProfile — writes to backend API (authoritative) + localStorage cache
   //
   // Photo handling strategy:
   //   1. If photo is a data: URI → try uploading to Firebase Storage
@@ -209,25 +210,20 @@ export function UserProfileProvider({ children }) {
     // Apply to React state immediately (optimistic update)
     setProfileState(nextProfile);
 
-    // Persist to RTDB (authoritative source of truth)
+    // Persist to backend API (authoritative source of truth)
     if (uid) {
-      // Build a clean payload for RTDB (no complex objects like sessions arrays
-      // that could have issues — serialize them)
-      const rtdbPayload = {};
+      const apiPayload = {};
       Object.entries(nextProfile).forEach(([key, val]) => {
-        if (val !== undefined && val !== null) {
-          // RTDB doesn't support arrays of objects natively — serialize sessions
-          if (key === 'sessions' && Array.isArray(val)) {
-            rtdbPayload[key] = JSON.stringify(val);
-          } else {
-            rtdbPayload[key] = val;
-          }
+        if (val !== undefined && val !== null && key !== 'sessions') {
+          apiPayload[key] = val;
         }
       });
-      // Ensure photoURL is always synced
-      rtdbPayload.photoURL = nextProfile.photo || nextProfile.photoURL;
+      apiPayload.photoURL = nextProfile.photo || nextProfile.photoURL;
 
-      await saveUserProfile(uid, rtdbPayload);
+      const saved = await authAPI.updateProfile(apiPayload);
+      if (saved?.user) {
+        setProfileState(prev => ({ ...prev, ...saved.user, photo: saved.user.photoURL || prev.photo }));
+      }
 
       // Update per-user localStorage cache
       const cacheKey = getLocalCacheKey(uid);

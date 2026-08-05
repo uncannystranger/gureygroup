@@ -126,7 +126,7 @@ export default function POSScreen() {
   const cashTenderedVal = parseFloat(cashTendered) || 0;
   const changeDue = Math.max(0, cashTenderedVal - grandTotal);
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return alert(t('pos.cart_empty_title', 'Cart is empty!'));
 
     if (paymentMethod === 'Cash' && cashTenderedVal < grandTotal) {
@@ -144,12 +144,22 @@ export default function POSScreen() {
       employeeName: 'Ahmed Cashier'
     };
 
-    addSale(saleData);
-    setLastCompletedSale({
-      ...saleData,
-      receiptNumber: `REC-${Date.now().toString().slice(-6)}`,
-      formattedDate: 'Just now'
-    });
+    try {
+      const savedSale = await addSale(saleData);
+      setLastCompletedSale({
+        ...saleData,
+        ...savedSale,
+        receiptNumber: savedSale.receiptNumber,
+        invoiceNumber: savedSale.invoiceNumber,
+        cashierName: savedSale.cashierName,
+        employeeId: savedSale.employeeId,
+        branchName: savedSale.branchName,
+        formattedDate: savedSale.formattedDate || 'Just now'
+      });
+    } catch (err) {
+      alert(err.message || 'Failed to complete sale.');
+      return;
+    }
 
     setIsCompleted(true);
     setIsReceiptModalOpen(true);

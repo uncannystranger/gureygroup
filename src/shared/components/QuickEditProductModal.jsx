@@ -11,6 +11,8 @@ export default function QuickEditProductModal({ isOpen, onClose, product }) {
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [lowStockLevel, setLowStockLevel] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (product) {
@@ -23,15 +25,23 @@ export default function QuickEditProductModal({ isOpen, onClose, product }) {
 
   if (!isOpen || !product) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    updateProduct(product.id, {
-      costPrice: parseFloat(costPrice),
-      sellingPrice: parseFloat(sellingPrice),
-      quantity: parseInt(quantity, 10),
-      lowStockLevel: parseInt(lowStockLevel, 10)
-    });
-    onClose();
+    setSaving(true);
+    setError(null);
+    try {
+      await updateProduct(product.id, {
+        costPrice: parseFloat(costPrice),
+        sellingPrice: parseFloat(sellingPrice),
+        quantity: parseInt(quantity, 10),
+        lowStockLevel: parseInt(lowStockLevel, 10)
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to update product.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -56,6 +66,11 @@ export default function QuickEditProductModal({ isOpen, onClose, product }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          {error && (
+            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold">
+              {error}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 text-xs font-semibold">
             <div>
               <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold">{t('products.cost', 'Cost Price')} ($)</label>
@@ -114,10 +129,11 @@ export default function QuickEditProductModal({ isOpen, onClose, product }) {
             </button>
             <button
               type="submit"
+              disabled={saving}
               className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-black shadow-md hover:scale-105 transition-all flex items-center space-x-1.5 btn-micro"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{t('common.save', 'Save Changes')}</span>
+              <span>{saving ? 'Saving...' : t('common.save', 'Save Changes')}</span>
             </button>
           </div>
         </form>

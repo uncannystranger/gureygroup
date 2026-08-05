@@ -13,6 +13,7 @@ import {
   onAuthStateChanged
 } from './firebase';
 import { loadUserProfile, getLocalCacheKey } from '../user/userProfileService';
+import { authAPI, sessionAPI } from '../../services/apiService';
 
 const AuthContext = createContext();
 
@@ -24,6 +25,75 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+
+  const normalizeBackendCompany = (company) => {
+    if (!company) return null;
+    return {
+      ...company,
+      id: company.id || company.companyId,
+      name: company.name || company.companyName || 'Organization',
+      tier: company.subscriptionTier || company.tier || 'Production SaaS',
+      currency: company.currency || 'USD ($)',
+      timezone: company.timezone || 'UTC',
+    };
+  };
+
+  const getDeviceInfo = () => {
+    const ua = navigator.userAgent || '';
+    const browser = ua.includes('Edg/') ? 'Microsoft Edge'
+      : ua.includes('Chrome/') ? 'Chrome'
+      : ua.includes('Safari/') ? 'Safari'
+      : ua.includes('Firefox/') ? 'Firefox'
+      : 'Unknown Browser';
+    const os = ua.includes('Mac OS X') ? 'macOS'
+      : ua.includes('Windows') ? 'Windows'
+      : ua.includes('Android') ? 'Android'
+      : ua.includes('iPhone') || ua.includes('iPad') ? 'iOS'
+      : 'Unknown OS';
+    const device = /Mobi|Android|iPhone|iPad/i.test(ua) ? 'Mobile device' : 'Desktop device';
+    return { browser, os, device, location: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown' };
+  };
+
+  const syncBackendAuth = async (fbUser) => {
+    const synced = await authAPI.syncFirebaseUser({
+      firebaseUid: fbUser.uid,
+      email: fbUser.email,
+      displayName: fbUser.displayName || fbUser.email?.split('@')[0],
+      photoURL: fbUser.photoURL || '',
+    });
+
+    const companyObj = normalizeBackendCompany(synced.company);
+    const userObj = {
+      uid: synced.user.uid,
+      email: synced.user.email,
+      displayName: synced.user.displayName || synced.user.email.split('@')[0],
+      photoURL: synced.user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(synced.user.displayName || synced.user.email)}&background=6366F1&color=fff`,
+      emailVerified: fbUser.emailVerified || false,
+      role: synced.user.role,
+      companyId: synced.user.companyId
+    };
+
+    localStorage.setItem('gurey_auth_token', synced.token);
+    localStorage.setItem('gurey_auth_user', JSON.stringify(userObj));
+    localStorage.setItem('gurey_tenant_company', JSON.stringify(companyObj));
+    localStorage.setItem('gurey_active_company', companyObj.id);
+
+    if (!sessionStorage.getItem('gurey_current_session_id')) {
+      try {
+        const sessionRes = await sessionAPI.create({
+          ...getDeviceInfo(),
+          userName: userObj.displayName,
+        });
+        if (sessionRes?.session?._id) {
+          sessionStorage.setItem('gurey_current_session_id', sessionRes.session._id);
+        }
+      } catch (err) {
+        console.warn('[Auth] Failed to record backend session:', err);
+      }
+    }
+
+    return { user: userObj, company: companyObj };
+  };
 
   // Helper to persist account mapping
   const validateUniqueRegistration = (email) => {
@@ -68,48 +138,38 @@ export function AuthProvider({ children }) {
           console.warn("Failed to reload firebase user status:", e);
         }
 
-        const existingReg = validateUniqueRegistration(fbUser.email);
-        const companyId = existingReg ? existingReg.companyId : `comp_${fbUser.uid.slice(0, 8)}`;
-        const companyName = existingReg ? existingReg.companyName : (fbUser.displayName ? `${fbUser.displayName.split(' ')[0]}'s Business` : 'My Organization');
-
-        const companyObj = tenantCompany || {
-          id: companyId,
-          name: companyName,
-          tier: 'Production SaaS',
-          currency: 'USD ($)',
-          timezone: 'UTC'
-        };
-
-        // Load persisted photoURL from Firestore so the avatar is correct
-        // immediately on session restore (before UserProfileContext hydrates)
-        let persistedPhotoURL = fbUser.photoURL;
         try {
-          const firestoreProfile = await loadUserProfile(fbUser.uid);
-          if (firestoreProfile?.photoURL) {
-            persistedPhotoURL = firestoreProfile.photoURL;
-          }
-        } catch { /* non-fatal — fall back to Firebase Auth photoURL */ }
+          const { user, company } = await syncBackendAuth(fbUser);
 
-        const userObj = {
-          uid: fbUser.uid,
-          email: fbUser.email,
-          displayName: fbUser.displayName || fbUser.email.split('@')[0],
-          photoURL: persistedPhotoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(fbUser.displayName || fbUser.email)}&background=6366F1&color=fff`,
-          emailVerified: fbUser.emailVerified || false,
-          role: 'Owner',
-          companyId: companyObj.id
-        };
+          let persistedPhotoURL = user.photoURL;
+          try {
+            const firestoreProfile = await loadUserProfile(fbUser.uid);
+            if (firestoreProfile?.photoURL) {
+              persistedPhotoURL = firestoreProfile.photoURL;
+            }
+          } catch { /* non-fatal */ }
 
-        setCurrentUser(userObj);
-        setTenantCompany(companyObj);
-        localStorage.setItem('gurey_auth_user', JSON.stringify(userObj));
-        localStorage.setItem('gurey_tenant_company', JSON.stringify(companyObj));
+          const hydratedUser = { ...user, photoURL: persistedPhotoURL };
+          setCurrentUser(hydratedUser);
+          setTenantCompany(company);
+          localStorage.setItem('gurey_auth_user', JSON.stringify(hydratedUser));
+        } catch (err) {
+          console.error('[Auth] Backend auth synchronization failed:', err);
+          setCurrentUser(null);
+          setTenantCompany(null);
+          localStorage.removeItem('gurey_auth_token');
+          localStorage.removeItem('gurey_auth_user');
+          localStorage.removeItem('gurey_tenant_company');
+          setAuthError('Authentication service is unavailable. Please try again when the backend is reachable.');
+        }
       } else {
         // No active Firebase session — always clear state and stale localStorage
         setCurrentUser(null);
         setTenantCompany(null);
         localStorage.removeItem('gurey_auth_user');
         localStorage.removeItem('gurey_tenant_company');
+        localStorage.removeItem('gurey_auth_token');
+        sessionStorage.removeItem('gurey_current_session_id');
       }
       setAuthLoading(false);
     });
@@ -145,52 +205,10 @@ export function AuthProvider({ children }) {
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser = result.user;
 
-      const existingReg = validateUniqueRegistration(fbUser.email);
-      let companyObj;
-      let userObj;
-
-      if (existingReg) {
-        companyObj = {
-          id: existingReg.companyId,
-          name: existingReg.companyName || 'Business Workspace',
-          tier: 'Production SaaS',
-          currency: 'USD ($)',
-          timezone: 'UTC'
-        };
-        userObj = {
-          uid: fbUser.uid,
-          email: fbUser.email,
-          displayName: fbUser.displayName || 'Account Owner',
-          photoURL: fbUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(fbUser.displayName || fbUser.email)}&background=6366F1&color=fff`,
-          emailVerified: true, // Google accounts are auto-verified
-          role: 'Owner',
-          companyId: existingReg.companyId
-        };
-      } else {
-        const newCompanyId = `comp_${Date.now().toString(36)}`;
-        companyObj = {
-          id: newCompanyId,
-          name: `${fbUser.displayName ? fbUser.displayName.split(' ')[0] : 'My'} Organization`,
-          tier: 'Production SaaS',
-          currency: 'USD ($)',
-          timezone: 'UTC'
-        };
-        userObj = {
-          uid: fbUser.uid,
-          email: fbUser.email,
-          displayName: fbUser.displayName || 'Account Owner',
-          photoURL: fbUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(fbUser.displayName || fbUser.email)}&background=6366F1&color=fff`,
-          emailVerified: true, // Google accounts are auto-verified
-          role: 'Owner',
-          companyId: newCompanyId
-        };
-        registerAccountWorkspace(userObj, companyObj);
-      }
-
-      setCurrentUser(userObj);
-      setTenantCompany(companyObj);
-      localStorage.setItem('gurey_active_company', companyObj.id);
-      return { user: userObj, company: companyObj };
+      const { user, company } = await syncBackendAuth(fbUser);
+      setCurrentUser(user);
+      setTenantCompany(company);
+      return { user, company };
     } catch (err) {
       console.error("Google Auth error:", err);
       if (err.code === 'auth/popup-closed-by-user') {
@@ -219,28 +237,14 @@ export function AuthProvider({ children }) {
       }
 
       const existingReg = validateUniqueRegistration(email);
-      const companyId = existingReg ? existingReg.companyId : `comp_${fbUser.uid.slice(0, 8)}`;
+      if (!existingReg) {
+        console.warn('[Auth] Local account registry missing; using backend workspace sync as source of truth.');
+      }
 
-      const companyObj = {
-        id: companyId,
-        name: existingReg ? existingReg.companyName : 'Organization',
-        tier: 'Production SaaS'
-      };
-
-      const userObj = {
-        uid: fbUser.uid,
-        email: fbUser.email,
-        displayName: fbUser.displayName || email.split('@')[0],
-        photoURL: fbUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(fbUser.displayName || email)}&background=6366F1&color=fff`,
-        emailVerified: fbUser.emailVerified || false,
-        role: 'Owner',
-        companyId: companyId
-      };
-
-      setCurrentUser(userObj);
-      setTenantCompany(companyObj);
-      localStorage.setItem('gurey_active_company', companyId);
-      return { user: userObj, company: companyObj };
+      const { user, company } = await syncBackendAuth(fbUser);
+      setCurrentUser(user);
+      setTenantCompany(company);
+      return { user, company };
     } catch (err) {
       console.error("Email Login Error:", err);
       let errMsg = 'Invalid email or password.';
@@ -278,31 +282,15 @@ export function AuthProvider({ children }) {
         console.warn("Automatic verification email dispatch failed:", e);
       });
 
-      const newCompanyId = `comp_${Date.now().toString(36)}`;
-      const companyObj = {
-        id: newCompanyId,
-        name: companyName || `${fullName || 'User'}'s Organization`,
-        tier: 'Production SaaS',
-        currency: 'USD ($)',
-        timezone: 'UTC'
-      };
+      const { user, company } = await syncBackendAuth(fbUser);
 
-      const userObj = {
-        uid: fbUser.uid,
-        email: email,
-        displayName: fullName || email.split('@')[0],
-        photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || email)}&background=6366F1&color=fff`,
-        emailVerified: false, // Newly registered users must verify email
-        role: 'Owner',
-        companyId: newCompanyId
-      };
+      const companyObj = companyName ? { ...company, name: companyName } : company;
+      registerAccountWorkspace(user, companyObj);
 
-      registerAccountWorkspace(userObj, companyObj);
-
-      setCurrentUser(userObj);
+      setCurrentUser(user);
       setTenantCompany(companyObj);
-      localStorage.setItem('gurey_active_company', newCompanyId);
-      return { user: userObj, company: companyObj };
+      localStorage.setItem('gurey_tenant_company', JSON.stringify(companyObj));
+      return { user, company: companyObj };
     } catch (err) {
       console.error("Email Signup Error:", err);
       let errMsg = 'Failed to create workspace account.';
@@ -396,44 +384,41 @@ export function AuthProvider({ children }) {
 
   // 9. Production Logout (Destroy Session Completely)
   const logout = async () => {
+    const uid = currentUser?.uid || auth.currentUser?.uid;
+    const sessionId = sessionStorage.getItem('gurey_current_session_id');
+
+    setCurrentUser(null);
+    setTenantCompany(null);
+    window.dispatchEvent(new CustomEvent('gurey:logout'));
+
     try {
+      await sessionAPI.logout(sessionId).catch(() => {});
       await firebaseSignOut(auth).catch(() => {});
     } catch (err) {
       console.warn("Logout error:", err);
     }
 
-    // Completely clear react state
-    setCurrentUser(null);
-    setTenantCompany(null);
-
-    // Clear all authentication & tenant keys from LocalStorage & SessionStorage
-    const keysToRemove = [
-      'gurey_auth_user',
-      'gurey_tenant_company',
-      'gurey_user_profile',
-      'gurey_active_company',
-      'gurey_active_branch',
-      'gurey_held_carts',
-      'firebase:authUser:' + (auth.app?.options?.apiKey || '') + ':[DEFAULT]'
-    ];
-    
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-
-    // Also clear the per-user scoped profile cache if we know the UID
-    // (prevents stale cached data appearing for a different user next login)
-    if (auth.currentUser?.uid) {
-      localStorage.removeItem(getLocalCacheKey(auth.currentUser.uid));
+    if (uid) {
+      localStorage.removeItem(getLocalCacheKey(uid));
     }
-    // Belt-and-suspenders: clear any gurey_user_profile_* keys in storage
+
     Object.keys(localStorage)
-      .filter(k => k.startsWith('gurey_user_profile_'))
+      .filter(k => k.startsWith('gurey_') || k.startsWith('firebase:authUser:'))
       .forEach(k => localStorage.removeItem(k));
 
     sessionStorage.clear();
 
-    // Prevent browser Back button from navigating back to protected pages
+    document.cookie.split(';').forEach((cookie) => {
+      const eqPos = cookie.indexOf('=');
+      const name = eqPos > -1 ? cookie.slice(0, eqPos).trim() : cookie.trim();
+      if (name) {
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+      }
+    });
+
     if (typeof window !== 'undefined' && window.history) {
-      window.history.pushState(null, '', window.location.href);
+      window.history.replaceState(null, '', '/login');
+      window.location.replace('/login');
     }
   };
 

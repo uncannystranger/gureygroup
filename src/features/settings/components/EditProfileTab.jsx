@@ -9,12 +9,7 @@ import {
   Save, 
   Loader2, 
   Check, 
-  Building2, 
-  Globe, 
-  Clock, 
-  Mail, 
   Phone, 
-  Briefcase,
   AlertCircle
 } from 'lucide-react';
 import { useUserProfile } from '../../../core/user/UserProfileContext';
@@ -129,9 +124,22 @@ export default function EditProfileTab() {
     if (!isDirty) return;
 
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 600));
-    await saveProfile(formState);
-    setIsSaving(false);
+    try {
+      await saveProfile({
+        photo: formState.photo,
+        firstName: formState.firstName,
+        lastName: formState.lastName,
+        displayName: formState.displayName,
+        phone: formState.phone,
+        address: formState.address,
+        dateOfBirth: formState.dateOfBirth,
+        gender: formState.gender,
+        preferredLanguage: formState.preferredLanguage,
+      });
+      setInitialState({ ...formState });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -266,7 +274,7 @@ export default function EditProfileTab() {
       {/* Profile Details Form Section */}
       <div className="glass-panel rounded-4xl p-6 space-y-4 card-hover-lift">
         <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-          <Briefcase className="w-4 h-4 text-indigo-500" /> Account & Business Information
+          <User className="w-4 h-4 text-indigo-500" /> Edit Profile
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
@@ -305,19 +313,6 @@ export default function EditProfileTab() {
 
           <div>
             <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold flex items-center gap-1">
-              <Mail className="w-3 h-3 text-indigo-500" /> {t('settings.email_address', 'Email Address')}
-            </label>
-            <input
-              type="email"
-              value={formState.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-              className="w-full px-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500/40 focus:outline-none transition-all"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold flex items-center gap-1">
               <Phone className="w-3 h-3 text-indigo-500" /> {t('settings.phone_number', 'Phone Number')}
             </label>
             <input
@@ -328,51 +323,42 @@ export default function EditProfileTab() {
             />
           </div>
 
-          <div>
-            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold flex items-center gap-1">
-              <Building2 className="w-3 h-3 text-indigo-500" /> {t('settings.business_name', 'Business Name')}
-            </label>
+          <div className="sm:col-span-2">
+            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold">{t('settings.address', 'Address')}</label>
             <input
               type="text"
-              value={formState.businessName}
-              onChange={(e) => handleChange('businessName', e.target.value)}
+              value={formState.address || ''}
+              onChange={(e) => handleChange('address', e.target.value)}
               className="w-full px-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500/40 focus:outline-none transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold">{t('settings.job_title', 'Job Title')}</label>
+            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold">{t('settings.date_of_birth', 'Date of Birth')}</label>
             <input
-              type="text"
-              value={formState.jobTitle}
-              onChange={(e) => handleChange('jobTitle', e.target.value)}
+              type="date"
+              value={formState.dateOfBirth || ''}
+              onChange={(e) => handleChange('dateOfBirth', e.target.value)}
               className="w-full px-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500/40 focus:outline-none transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold flex items-center gap-1">
-              <Globe className="w-3 h-3 text-indigo-500" /> {t('settings.country', 'Country')}
-            </label>
-            <input
-              type="text"
-              value={formState.country}
-              onChange={(e) => handleChange('country', e.target.value)}
+            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold">{t('settings.gender', 'Gender')}</label>
+            <select
+              value={formState.gender || ''}
+              onChange={(e) => handleChange('gender', e.target.value)}
               className="w-full px-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500/40 focus:outline-none transition-all"
-            />
+            >
+              <option value="">Prefer not to say</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="non_binary">Non-binary</option>
+              <option value="self_describe">Self-describe</option>
+            </select>
           </div>
 
-          <div>
-            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold">{t('settings.city', 'City')}</label>
-            <input
-              type="text"
-              value={formState.city}
-              onChange={(e) => handleChange('city', e.target.value)}
-              className="w-full px-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500/40 focus:outline-none transition-all"
-            />
-          </div>
-
-          <div>
+          <div className="sm:col-span-2">
             <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold">{t('settings.preferred_language', 'Preferred Language')}</label>
             <select
               value={formState.preferredLanguage}
@@ -381,20 +367,6 @@ export default function EditProfileTab() {
             >
               <option value="English (US)">English (US)</option>
               <option value="Somali (🇸🇴)">Somali (🇸🇴)</option>
-            </select>
-          </div>
-
-          <div className="sm:col-span-2">
-            <label className="block text-slate-500 dark:text-slate-400 mb-1 font-bold flex items-center gap-1">
-              <Clock className="w-3 h-3 text-indigo-500" /> {t('settings.time_zone', 'Time Zone')}
-            </label>
-            <select
-              value={formState.timeZone}
-              onChange={(e) => handleChange('timeZone', e.target.value)}
-              className="w-full px-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500/40 focus:outline-none transition-all"
-            >
-              <option value="America/New_York (UTC-5)">America/New_York (UTC-5)</option>
-              <option value="Africa/Nairobi (UTC+3)">Africa/Nairobi (UTC+3)</option>
             </select>
           </div>
 

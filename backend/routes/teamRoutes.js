@@ -7,6 +7,123 @@ import Audit from '../models/Audit.js';
 import { enforceTenantIsolation, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
+
+/**
+ * GET /api/team/invitations/verify/:token
+ * Verify an invitation token (public — no auth required).
+ */
+router.get('/invitations/verify/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const invitation = await Invitation.findOne({ token });
+
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invitation not found or expired.' });
+    }
+
+    if (invitation.status !== 'pending') {
+      return res.status(400).json({ error: `Invitation has already been ${invitation.status}.` });
+    }
+
+    if (new Date() > invitation.expiresAt) {
+      await Invitation.findByIdAndUpdate(invitation._id, { status: 'expired' });
+      return res.status(400).json({ error: 'Invitation has expired.' });
+    }
+
+    res.json({
+      valid: true,
+      email: invitation.email,
+      companyName: invitation.companyName,
+      role: invitation.role,
+      branchName: invitation.branchName,
+      invitedByName: invitation.invitedByName,
+      expiresAt: invitation.expiresAt,
+    });
+  } catch (error) {
+    console.error('Verify Invitation Error:', error);
+    res.status(500).json({ error: 'Failed to verify invitation.' });
+  }
+});
+
+/**
+ * POST /api/team/invitations/accept/:token
+ * Accept an invitation — joins the user to the organization.
+ */
+router.post('/invitations/accept/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { firebaseUid, email, displayName, photoURL } = req.body;
+
+    if (!firebaseUid || !email) {
+      return res.status(400).json({ error: 'User credentials are required.' });
+    }
+
+    const invitation = await Invitation.findOne({ token, status: 'pending' });
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invitation not found, expired, or already used.' });
+    }
+
+    if (new Date() > invitation.expiresAt) {
+      await Invitation.findByIdAndUpdate(invitation._id, { status: 'expired' });
+      return res.status(400).json({ error: 'Invitation has expired.' });
+    }
+
+    let user = await User.findOne({ firebaseUid });
+    if (!user) {
+      user = await User.create({
+        firebaseUid,
+        email: email.toLowerCase(),
+        displayName: displayName || email.split('@')[0],
+        photoURL: photoURL || '',
+        companyId: invitation.companyId,
+        role: invitation.role,
+        status: 'Active',
+      });
+    } else {
+      user.companyId = invitation.companyId;
+      user.role = invitation.role;
+      await user.save();
+    }
+
+    await Membership.findOneAndUpdate(
+      { userId: firebaseUid, companyId: invitation.companyId },
+      {
+        userId: firebaseUid,
+        companyId: invitation.companyId,
+        role: invitation.role,
+        branchId: invitation.branchId,
+        status: 'active',
+        invitedBy: invitation.invitedBy,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    invitation.status = 'accepted';
+    invitation.acceptedAt = new Date();
+    invitation.acceptedBy = firebaseUid;
+    await invitation.save();
+
+    const org = await Organization.findOne({ companyId: invitation.companyId });
+
+    await Audit.create({
+      companyId: invitation.companyId,
+      action: 'INVITATION_ACCEPTED',
+      userEmail: email,
+      details: `${displayName || email} accepted invitation as ${invitation.role}`,
+    });
+
+    res.json({
+      success: true,
+      organization: org,
+      role: invitation.role,
+      branchId: invitation.branchId,
+    });
+  } catch (error) {
+    console.error('Accept Invitation Error:', error);
+    res.status(500).json({ error: 'Failed to accept invitation.' });
+  }
+});
+
 router.use(enforceTenantIsolation);
 
 // ─── Team Members ─────────────────────────────────────────────────────────────
@@ -181,7 +298,10 @@ router.post('/invitations', requireRole(['Owner', 'Admin']), async (req, res) =>
       expiresAt,
     });
 
-    const origin = req.headers.origin || process.env.FRONTEND_URL || (req.headers.host ? `${req.protocol || 'https'}://${req.headers.host}` : 'http://localhost:3000');
+    const origin = req.headers.origin || process.env.FRONTEND_URL || (req.headers.host ? `${req.protocol || 'https'}://${req.headers.host}` : null);
+    if (!origin) {
+      return res.status(500).json({ error: 'FRONTEND_URL is required to generate invitation links.' });
+    }
     const inviteUrl = `${origin}/invite/${token}`;
 
 
@@ -214,121 +334,6 @@ router.get('/invitations', requireRole(['Owner', 'Admin']), async (req, res) => 
   } catch (error) {
     console.error('List Invitations Error:', error);
     res.status(500).json({ error: 'Failed to fetch invitations.' });
-  }
-});
-
-/**
- * GET /api/team/invitations/verify/:token
- * Verify an invitation token (public — no auth required).
- */
-router.get('/invitations/verify/:token', async (req, res) => {
-  try {
-    const { token } = req.params;
-    const invitation = await Invitation.findOne({ token });
-
-    if (!invitation) {
-      return res.status(404).json({ error: 'Invitation not found or expired.' });
-    }
-
-    if (invitation.status !== 'pending') {
-      return res.status(400).json({ error: `Invitation has already been ${invitation.status}.` });
-    }
-
-    if (new Date() > invitation.expiresAt) {
-      await Invitation.findByIdAndUpdate(invitation._id, { status: 'expired' });
-      return res.status(400).json({ error: 'Invitation has expired.' });
-    }
-
-    res.json({
-      valid: true,
-      email: invitation.email,
-      companyName: invitation.companyName,
-      role: invitation.role,
-      branchName: invitation.branchName,
-      invitedByName: invitation.invitedByName,
-      expiresAt: invitation.expiresAt,
-    });
-  } catch (error) {
-    console.error('Verify Invitation Error:', error);
-    res.status(500).json({ error: 'Failed to verify invitation.' });
-  }
-});
-
-/**
- * POST /api/team/invitations/accept/:token
- * Accept an invitation — joins the user to the organization.
- */
-router.post('/invitations/accept/:token', async (req, res) => {
-  try {
-    const { token } = req.params;
-    const { firebaseUid, email, displayName, photoURL } = req.body;
-
-    if (!firebaseUid || !email) {
-      return res.status(400).json({ error: 'User credentials are required.' });
-    }
-
-    const invitation = await Invitation.findOne({ token, status: 'pending' });
-    if (!invitation) {
-      return res.status(404).json({ error: 'Invitation not found, expired, or already used.' });
-    }
-
-    if (new Date() > invitation.expiresAt) {
-      await Invitation.findByIdAndUpdate(invitation._id, { status: 'expired' });
-      return res.status(400).json({ error: 'Invitation has expired.' });
-    }
-
-    // Create or update user
-    let user = await User.findOne({ firebaseUid });
-    if (!user) {
-      user = await User.create({
-        firebaseUid,
-        email: email.toLowerCase(),
-        displayName: displayName || email.split('@')[0],
-        photoURL: photoURL || '',
-        companyId: invitation.companyId,
-        role: invitation.role,
-        status: 'Active',
-      });
-    } else {
-      user.companyId = invitation.companyId;
-      user.role = invitation.role;
-      await user.save();
-    }
-
-    // Create membership
-    await Membership.create({
-      userId: firebaseUid,
-      companyId: invitation.companyId,
-      role: invitation.role,
-      branchId: invitation.branchId,
-      status: 'active',
-      invitedBy: invitation.invitedBy,
-    });
-
-    // Mark invitation as accepted
-    invitation.status = 'accepted';
-    invitation.acceptedAt = new Date();
-    invitation.acceptedBy = firebaseUid;
-    await invitation.save();
-
-    const org = await Organization.findOne({ companyId: invitation.companyId });
-
-    await Audit.create({
-      companyId: invitation.companyId,
-      action: 'INVITATION_ACCEPTED',
-      userEmail: email,
-      details: `${displayName || email} accepted invitation as ${invitation.role}`,
-    });
-
-    res.json({
-      success: true,
-      organization: org,
-      role: invitation.role,
-      branchId: invitation.branchId,
-    });
-  } catch (error) {
-    console.error('Accept Invitation Error:', error);
-    res.status(500).json({ error: 'Failed to accept invitation.' });
   }
 });
 

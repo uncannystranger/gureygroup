@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { branchAPI, productAPI, saleAPI } from '../../services/apiService';
 
 const MultiTenantContext = createContext();
 
@@ -28,36 +29,15 @@ export function MultiTenantProvider({ children }) {
     }];
   });
 
-  const [branches, setBranches] = useState(() => {
-    const saved = localStorage.getItem(`gurey_branches_${activeCompanyId}`);
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return [{
-      id: `branch_${activeCompanyId}`,
-      companyId: activeCompanyId,
-      name: 'Main Store Branch',
-      code: 'BR-01',
-      city: 'Main Location',
-      phone: '+1 555-0100',
-      manager: currentUser?.displayName || 'Store Manager',
-      isActive: true
-    }];
-  });
+  const [branches, setBranches] = useState([]);
 
   const [activeBranchId, setActiveBranchId] = useState(`branch_${activeCompanyId}`);
   const [warehouses, setWarehouses] = useState([]);
 
   // Isolated Collections - Default to EMPTY arrays for production user isolation
-  const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem(`gurey_products_${activeCompanyId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [products, setProducts] = useState([]);
 
-  const [sales, setSales] = useState(() => {
-    const saved = localStorage.getItem(`gurey_sales_${activeCompanyId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [sales, setSales] = useState([]);
 
   const [purchaseOrders, setPurchaseOrders] = useState(() => {
     const saved = localStorage.getItem(`gurey_purchase_orders_${activeCompanyId}`);
@@ -108,14 +88,57 @@ export function MultiTenantProvider({ children }) {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const normalizeProduct = (product) => ({
+    ...product,
+    id: product._id || product.id,
+    quantity: product.quantity ?? product.stock ?? 0,
+    lowStockLevel: product.lowStockLevel ?? product.minStockThreshold ?? 5,
+    images: product.images || (product.primaryImage ? [product.primaryImage] : []),
+  });
+
+  const normalizeBranch = (branch) => ({
+    ...branch,
+    id: branch._id || branch.id,
+    isActive: branch.status !== 'inactive',
+    manager: branch.managerName || branch.manager || '',
+  });
+
   // Re-sync state whenever activeCompanyId changes
   useEffect(() => {
-    if (activeCompanyId) {
-      const p = localStorage.getItem(`gurey_products_${activeCompanyId}`);
-      setProducts(p ? JSON.parse(p) : []);
+    if (!currentUser?.uid) {
+      setProducts([]);
+      setBranches([]);
+      setSales([]);
+      return;
+    }
 
-      const s = localStorage.getItem(`gurey_sales_${activeCompanyId}`);
-      setSales(s ? JSON.parse(s) : []);
+    if (activeCompanyId) {
+      productAPI.list()
+        .then((data) => setProducts((Array.isArray(data) ? data : []).map(normalizeProduct)))
+        .catch((err) => {
+          console.warn('[MultiTenant] Failed to load products from backend:', err);
+          setProducts([]);
+        });
+
+      branchAPI.list()
+        .then((data) => setBranches((data.branches || []).map(normalizeBranch)))
+        .catch((err) => {
+          console.warn('[MultiTenant] Failed to load branches from backend:', err);
+          setBranches([]);
+        });
+
+      saleAPI.list({ limit: 250 })
+        .then((data) => setSales((data.sales || []).map((sale) => ({
+          ...sale,
+          id: sale._id || sale.id,
+          total: sale.totalAmount ?? sale.total ?? 0,
+          date: sale.createdAt,
+          formattedDate: sale.createdAt ? new Date(sale.createdAt).toLocaleString() : '',
+        }))))
+        .catch((err) => {
+          console.warn('[MultiTenant] Failed to load sales from backend:', err);
+          setSales([]);
+        });
 
       const po = localStorage.getItem(`gurey_purchase_orders_${activeCompanyId}`);
       setPurchaseOrders(po ? JSON.parse(po) : []);
@@ -138,13 +161,11 @@ export function MultiTenantProvider({ children }) {
       const hc = localStorage.getItem(`gurey_held_carts_${activeCompanyId}`);
       setHeldCarts(hc ? JSON.parse(hc) : []);
     }
-  }, [activeCompanyId]);
+  }, [activeCompanyId, currentUser?.uid]);
 
-  // Persist tenant state to localStorage scoped by activeCompanyId
+  // Persist UI-only state that does not have backend routes yet.
   useEffect(() => {
     if (!activeCompanyId) return;
-    localStorage.setItem(`gurey_products_${activeCompanyId}`, JSON.stringify(products));
-    localStorage.setItem(`gurey_sales_${activeCompanyId}`, JSON.stringify(sales));
     localStorage.setItem(`gurey_purchase_orders_${activeCompanyId}`, JSON.stringify(purchaseOrders));
     localStorage.setItem(`gurey_suppliers_${activeCompanyId}`, JSON.stringify(suppliers));
     localStorage.setItem(`gurey_customers_${activeCompanyId}`, JSON.stringify(customers));
@@ -153,7 +174,7 @@ export function MultiTenantProvider({ children }) {
     localStorage.setItem(`gurey_stock_adjustments_${activeCompanyId}`, JSON.stringify(stockAdjustments));
     localStorage.setItem(`gurey_notifications_${activeCompanyId}`, JSON.stringify(notifications));
     localStorage.setItem(`gurey_held_carts_${activeCompanyId}`, JSON.stringify(heldCarts));
-  }, [activeCompanyId, products, sales, purchaseOrders, suppliers, customers, employees, activities, stockAdjustments, notifications, heldCarts]);
+  }, [activeCompanyId, purchaseOrders, suppliers, customers, employees, activities, stockAdjustments, notifications, heldCarts]);
 
   const activeCompany = companies.find(c => c.id === activeCompanyId) || (tenantCompany || companies[0]);
   const activeBranch = branches.find(b => b.id === activeBranchId) || branches[0];
@@ -199,126 +220,117 @@ export function MultiTenantProvider({ children }) {
   };
 
   // Add Product
-  const addProduct = (newProduct) => {
+  const addProduct = async (newProduct) => {
     const costPrice = parseFloat(newProduct.costPrice) || 0;
     const sellingPrice = parseFloat(newProduct.sellingPrice) || 0;
     const qty = parseInt(newProduct.quantity, 10) || 0;
 
-    const productWithId = {
+    const created = await productAPI.create({
       ...newProduct,
-      id: `prod_${Date.now()}`,
-      companyId: activeCompanyId,
       branchId: activeBranchId,
       costPrice,
       sellingPrice,
-      quantity: qty,
-      profitMargin: sellingPrice > 0 ? (((sellingPrice - costPrice) / sellingPrice) * 100).toFixed(1) : 0,
-      status: qty === 0 ? 'Out of Stock' : (qty <= (newProduct.lowStockLevel || 15) ? 'Low Stock' : 'In Stock'),
-      isArchived: false,
-      images: newProduct.images || ['https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=400&q=80']
-    };
+      stock: qty,
+      minStockThreshold: parseInt(newProduct.lowStockLevel, 10) || 5,
+      images: newProduct.images || [],
+      primaryImage: newProduct.images?.[0] || '',
+    });
 
+    const productWithId = normalizeProduct(created);
     setProducts(prev => [productWithId, ...prev]);
     logActivity(`Added Product: ${newProduct.name}`);
     addNotification('Product Added', `${newProduct.name} (SKU: ${newProduct.sku}) added to catalog.`, 'success');
+    return productWithId;
   };
 
   // Update Product
-  const updateProduct = (productId, updatedFields) => {
+  const updateProduct = async (productId, updatedFields) => {
+    const saved = await productAPI.update(productId, updatedFields);
+    const normalized = normalizeProduct(saved);
     setProducts(prev => prev.map(p => {
       if (p.id === productId) {
-        const costPrice = updatedFields.costPrice !== undefined ? parseFloat(updatedFields.costPrice) : p.costPrice;
-        const sellingPrice = updatedFields.sellingPrice !== undefined ? parseFloat(updatedFields.sellingPrice) : p.sellingPrice;
-        const qty = updatedFields.quantity !== undefined ? parseInt(updatedFields.quantity, 10) : p.quantity;
-        const lowStock = updatedFields.lowStockLevel !== undefined ? parseInt(updatedFields.lowStockLevel, 10) : p.lowStockLevel;
-        
-        const profitMargin = sellingPrice > 0 ? (((sellingPrice - costPrice) / sellingPrice) * 100).toFixed(1) : p.profitMargin;
-        const status = qty === 0 ? 'Out of Stock' : (qty <= lowStock ? 'Low Stock' : 'In Stock');
-
-        return {
-          ...p,
-          ...updatedFields,
-          costPrice,
-          sellingPrice,
-          quantity: qty,
-          lowStockLevel: lowStock,
-          profitMargin,
-          status
-        };
+        return normalized;
       }
       return p;
     }));
     logActivity(`Updated Product Details (ID: ${productId})`);
     addNotification('Product Updated', 'Product details saved successfully.', 'info');
+    return normalized;
   };
 
   // Duplicate Product
-  const duplicateProduct = (productId) => {
+  const duplicateProduct = async (productId) => {
     const target = products.find(p => p.id === productId);
     if (!target) return;
 
-    const duplicated = {
-      ...target,
-      id: `prod_${Date.now()}`,
+    const duplicated = await productAPI.create({
       name: `${target.name} (Copy)`,
       sku: `${target.sku}-COPY`,
-      barcode: `${Math.floor(859000000000 + Math.random() * 999999999)}`,
-      quantity: target.quantity
-    };
+      barcode: '',
+      brand: target.brand,
+      category: target.category,
+      supplier: target.supplier,
+      description: target.description,
+      costPrice: target.costPrice,
+      sellingPrice: target.sellingPrice,
+      stock: target.quantity,
+      minStockThreshold: target.lowStockLevel,
+      images: target.images || [],
+      primaryImage: target.primaryImage || target.images?.[0] || '',
+    });
 
-    setProducts(prev => [duplicated, ...prev]);
+    const normalized = normalizeProduct(duplicated);
+    setProducts(prev => [normalized, ...prev]);
     logActivity(`Duplicated Product: ${target.name}`);
-    addNotification('Product Duplicated', `Created copy: ${duplicated.name}`, 'success');
+    addNotification('Product Duplicated', `Created copy: ${normalized.name}`, 'success');
   };
 
   // Archive / Restore Product
-  const archiveProduct = (productId) => {
+  const archiveProduct = async (productId) => {
+    await productAPI.archive(productId);
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, isArchived: true } : p));
     logActivity(`Archived Product ID: ${productId}`);
     addNotification('Product Archived', 'Product moved to archived catalog.', 'warning');
   };
 
-  const restoreProduct = (productId) => {
-    setProducts(prev => prev.map(p => p.id === productId ? { ...p, isArchived: false } : p));
+  const restoreProduct = async (productId) => {
+    const restored = await productAPI.update(productId, { isArchived: false });
+    const normalized = normalizeProduct(restored);
+    setProducts(prev => prev.map(p => p.id === productId ? normalized : p));
     logActivity(`Restored Product ID: ${productId}`);
     addNotification('Product Restored', 'Product restored to active catalog.', 'success');
   };
 
   // Bulk Price Update
-  const bulkPriceUpdate = (productIds, percentageChange, isFixed = false) => {
-    setProducts(prev => prev.map(p => {
-      if (productIds.includes(p.id)) {
+  const bulkPriceUpdate = async (productIds, percentageChange, isFixed = false) => {
+    const updates = await Promise.all(products
+      .filter(p => productIds.includes(p.id))
+      .map(async (p) => {
         let newSellingPrice = p.sellingPrice;
         if (isFixed) {
           newSellingPrice = Math.max(0, p.sellingPrice + percentageChange);
         } else {
           newSellingPrice = Math.max(0, p.sellingPrice * (1 + percentageChange / 100));
         }
-        const profitMargin = newSellingPrice > 0 ? (((newSellingPrice - p.costPrice) / newSellingPrice) * 100).toFixed(1) : 0;
-        return {
-          ...p,
+        return normalizeProduct(await productAPI.update(p.id, {
           sellingPrice: parseFloat(newSellingPrice.toFixed(2)),
-          profitMargin
-        };
-      }
-      return p;
-    }));
+        }));
+      }));
+    setProducts(prev => prev.map(p => updates.find(u => u.id === p.id) || p));
     logActivity(`Bulk price update performed on ${productIds.length} products`);
     addNotification('Bulk Prices Updated', `Updated prices for ${productIds.length} items.`, 'success');
   };
 
   // Bulk Stock Adjustment
-  const bulkStockUpdate = (productIds, deltaQty, reason = 'Bulk Adjustment') => {
-    setProducts(prev => prev.map(p => {
-      if (productIds.includes(p.id)) {
+  const bulkStockUpdate = async (productIds, deltaQty, reason = 'Bulk Adjustment') => {
+    const updates = await Promise.all(products
+      .filter(p => productIds.includes(p.id))
+      .map(async (p) => {
         const newQty = Math.max(0, p.quantity + deltaQty);
-        const status = newQty === 0 ? 'Out of Stock' : (newQty <= p.lowStockLevel ? 'Low Stock' : 'In Stock');
-        
         logStockAdjustment(p.id, p.name, p.sku, deltaQty, reason);
-        return { ...p, quantity: newQty, status };
-      }
-      return p;
-    }));
+        return normalizeProduct(await productAPI.update(p.id, { stock: newQty }));
+      }));
+    setProducts(prev => prev.map(p => updates.find(u => u.id === p.id) || p));
     logActivity(`Bulk stock adjustment on ${productIds.length} products (${deltaQty > 0 ? '+' : ''}${deltaQty})`);
     addNotification('Bulk Stock Adjusted', `Adjusted stock for ${productIds.length} items.`, 'info');
   };
@@ -331,7 +343,8 @@ export function MultiTenantProvider({ children }) {
   };
 
   // Bulk Archive
-  const bulkArchiveProducts = (productIds) => {
+  const bulkArchiveProducts = async (productIds) => {
+    await Promise.all(productIds.map(id => productAPI.archive(id)));
     setProducts(prev => prev.map(p => productIds.includes(p.id) ? { ...p, isArchived: true } : p));
     logActivity(`Bulk archived ${productIds.length} products`);
     addNotification('Bulk Archiving', `Archived ${productIds.length} products.`, 'warning');
@@ -354,16 +367,25 @@ export function MultiTenantProvider({ children }) {
   };
 
   // Add Sale Workflow
-  const addSale = (saleData) => {
-    const newSale = {
+  const addSale = async (saleData) => {
+    const saved = await saleAPI.create({
       ...saleData,
-      id: `sale_${Date.now()}`,
-      companyId: activeCompanyId,
       branchId: activeBranchId,
-      receiptNumber: `REC-${Date.now().toString().slice(-6)}`,
-      date: new Date().toISOString(),
-      formattedDate: 'Just now',
-      status: 'Completed'
+      branchName: activeBranch?.name || '',
+      posTerminalId: saleData.posTerminalId || 'web-pos',
+      cashierName: saleData.cashierName || saleData.employeeName || currentUser?.displayName || currentUser?.email,
+      employeeId: saleData.employeeId || currentUser?.uid,
+      totalAmount: saleData.total,
+      taxRate: activeCompany?.taxRate || 0,
+    });
+
+    const sale = saved.sale;
+    const newSale = {
+      ...sale,
+      id: sale._id,
+      total: sale.totalAmount,
+      date: sale.createdAt,
+      formattedDate: sale.createdAt ? new Date(sale.createdAt).toLocaleString() : 'Just now',
     };
 
     setSales(prev => [newSale, ...prev]);
@@ -413,6 +435,7 @@ export function MultiTenantProvider({ children }) {
 
     logActivity(`Completed Sale ${newSale.receiptNumber} ($${newSale.total.toFixed(2)}) via ${newSale.paymentMethod}`);
     addNotification('Sale Completed', `Receipt #${newSale.receiptNumber} processed ($${newSale.total.toFixed(2)})`, 'success');
+    return newSale;
   };
 
   // Refund Workflow

@@ -11,22 +11,36 @@ const saleItemSchema = new mongoose.Schema({
 
 const saleSchema = new mongoose.Schema({
   companyId: { type: String, required: true, index: true },
+  branchId: { type: String, default: null, index: true },
+  branchName: { type: String, default: '' },
+  posTerminalId: { type: String, default: '' },
+  receiptNumber: { type: String, required: true },
   invoiceNumber: { type: String, required: true },
-  customerName: { type: String, default: 'Walk-in Customer' },
-  customerPhone: { type: String, default: '' },
+  cashierId: { type: String, required: true },
   cashierName: { type: String, required: true },
+  employeeId: { type: String, default: '' },
+  customerName: { type: String, default: 'Walk-in Customer' },
+  customerId: { type: String, default: null },
+  customerPhone: { type: String, default: '' },
   items: [saleItemSchema],
   subtotal: { type: Number, required: true },
   discount: { type: Number, default: 0 },
   tax: { type: Number, default: 0 },
+  taxRate: { type: Number, default: 0 },
   totalAmount: { type: Number, required: true },
   paymentMethod: { type: String, enum: ['Cash', 'Credit Card', 'Mobile Money', 'Gift Card'], default: 'Credit Card' },
+  managerApproval: {
+    required: { type: Boolean, default: false },
+    approvedBy: { type: String, default: null },
+    approvedAt: { type: Date, default: null },
+  },
   status: { type: String, enum: ['Completed', 'Refunded', 'Pending'], default: 'Completed' }
 }, {
   timestamps: true
 });
 
 saleSchema.index({ companyId: 1, invoiceNumber: 1 }, { unique: true });
+saleSchema.index({ companyId: 1, receiptNumber: 1 }, { unique: true });
 saleSchema.index({ companyId: 1, createdAt: -1 });
 
 export default mongoose.models.Sale || mongoose.model('Sale', saleSchema);
