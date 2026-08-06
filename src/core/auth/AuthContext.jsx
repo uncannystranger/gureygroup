@@ -135,91 +135,98 @@ export function AuthProvider({ children }) {
 
   // Firebase Auth Observer for Session Persistence
   useEffect(() => {
-    // Safety timeout: if Firebase never responds, stop loading after 5 seconds
+    // Safety timeout: if Firebase never responds, stop loading after 3.5 seconds
     const safetyTimeout = setTimeout(() => {
       setAuthLoading(false);
-    }, 5000);
+    }, 3500);
 
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      clearTimeout(safetyTimeout);
+    let unsubscribe = () => {};
 
-      if (fbUser) {
-        // Reload user to get fresh emailVerified status
-        try {
-          await fbUser.reload();
-        } catch (e) {
-          console.warn("Failed to reload firebase user status:", e);
-        }
+    try {
+      unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+        clearTimeout(safetyTimeout);
 
-        try {
-          const { user, company } = await syncBackendAuth(fbUser);
-
-          let persistedPhotoURL = user.photoURL;
+        if (fbUser) {
+          // Reload user to get fresh emailVerified status
           try {
-            const firestoreProfile = await loadUserProfile(fbUser.uid);
-            if (firestoreProfile?.photoURL) {
-              persistedPhotoURL = firestoreProfile.photoURL;
-            }
-          } catch { /* non-fatal */ }
+            await fbUser.reload();
+          } catch (e) {
+            console.warn("Failed to reload firebase user status:", e);
+          }
 
-          const hydratedUser = { ...user, photoURL: persistedPhotoURL };
-          setCurrentUser(hydratedUser);
-          setTenantCompany(company);
-          localStorage.setItem('gurey_auth_user', JSON.stringify(hydratedUser));
-        } catch (err) {
-          console.error('[Auth] Backend auth synchronization failed:', err);
+          try {
+            const { user, company } = await syncBackendAuth(fbUser);
+
+            let persistedPhotoURL = user.photoURL;
+            try {
+              const firestoreProfile = await loadUserProfile(fbUser.uid);
+              if (firestoreProfile?.photoURL) {
+                persistedPhotoURL = firestoreProfile.photoURL;
+              }
+            } catch { /* non-fatal */ }
+
+            const hydratedUser = { ...user, photoURL: persistedPhotoURL };
+            setCurrentUser(hydratedUser);
+            setTenantCompany(company);
+            localStorage.setItem('gurey_auth_user', JSON.stringify(hydratedUser));
+          } catch (err) {
+            console.error('[Auth] Backend auth synchronization failed:', err);
+            setCurrentUser(null);
+            setTenantCompany(null);
+            localStorage.removeItem('gurey_auth_token');
+            localStorage.removeItem('gurey_auth_user');
+            localStorage.removeItem('gurey_tenant_company');
+            setAuthError('Authentication service is unavailable. Please try again when the backend is reachable.');
+          }
+        } else {
+          const storedToken = localStorage.getItem('gurey_auth_token');
+          const storedUser = JSON.parse(localStorage.getItem('gurey_auth_user') || 'null');
+          if (storedUser?.authType === 'employee' && storedToken) {
+            try {
+              const session = await authAPI.me();
+              const membership = session.membership || {};
+              const backendUser = session.user || {};
+              const restoredUser = {
+                ...storedUser,
+                uid: backendUser.employeeId || backendUser.firebaseUid || storedUser.uid,
+                email: backendUser.email || storedUser.email,
+                displayName: backendUser.displayName || storedUser.displayName,
+                role: membership.role || storedUser.role,
+                permissions: membership.permissions || storedUser.permissions || [],
+                companyId: membership.companyId || storedUser.companyId,
+                emailVerified: true,
+                requiresEmailVerification: false,
+                authType: 'employee',
+              };
+              const company = normalizeBackendCompany(session.company);
+              setCurrentUser(restoredUser);
+              setTenantCompany(company);
+              localStorage.setItem('gurey_auth_user', JSON.stringify(restoredUser));
+              localStorage.setItem('gurey_tenant_company', JSON.stringify(company));
+              setAuthLoading(false);
+              return;
+            } catch (error) {
+              console.warn('[Auth] Employee session could not be restored:', error.message);
+            }
+          }
+          // No active Firebase session — always clear state and stale localStorage
           setCurrentUser(null);
           setTenantCompany(null);
-          localStorage.removeItem('gurey_auth_token');
           localStorage.removeItem('gurey_auth_user');
           localStorage.removeItem('gurey_tenant_company');
-          setAuthError('Authentication service is unavailable. Please try again when the backend is reachable.');
+          localStorage.removeItem('gurey_auth_token');
+          sessionStorage.removeItem('gurey_current_session_id');
         }
-      } else {
-        const storedToken = localStorage.getItem('gurey_auth_token');
-        const storedUser = JSON.parse(localStorage.getItem('gurey_auth_user') || 'null');
-        if (storedUser?.authType === 'employee' && storedToken) {
-          try {
-            const session = await authAPI.me();
-            const membership = session.membership || {};
-            const backendUser = session.user || {};
-            const restoredUser = {
-              ...storedUser,
-              uid: backendUser.employeeId || backendUser.firebaseUid || storedUser.uid,
-              email: backendUser.email || storedUser.email,
-              displayName: backendUser.displayName || storedUser.displayName,
-              role: membership.role || storedUser.role,
-              permissions: membership.permissions || storedUser.permissions || [],
-              companyId: membership.companyId || storedUser.companyId,
-              emailVerified: true,
-              requiresEmailVerification: false,
-              authType: 'employee',
-            };
-            const company = normalizeBackendCompany(session.company);
-            setCurrentUser(restoredUser);
-            setTenantCompany(company);
-            localStorage.setItem('gurey_auth_user', JSON.stringify(restoredUser));
-            localStorage.setItem('gurey_tenant_company', JSON.stringify(company));
-            setAuthLoading(false);
-            return;
-          } catch (error) {
-            console.warn('[Auth] Employee session could not be restored:', error.message);
-          }
-        }
-        // No active Firebase session — always clear state and stale localStorage
-        setCurrentUser(null);
-        setTenantCompany(null);
-        localStorage.removeItem('gurey_auth_user');
-        localStorage.removeItem('gurey_tenant_company');
-        localStorage.removeItem('gurey_auth_token');
-        sessionStorage.removeItem('gurey_current_session_id');
-      }
+        setAuthLoading(false);
+      });
+    } catch (authListenerErr) {
+      console.warn('[Auth] Auth state listener setup error:', authListenerErr);
       setAuthLoading(false);
-    });
+    }
 
     return () => {
       clearTimeout(safetyTimeout);
-      unsubscribe();
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, []);
 
