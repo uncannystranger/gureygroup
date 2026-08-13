@@ -22,7 +22,7 @@ const requireSecret = (name) => {
 };
 
 const JWT_SECRET = requireSecret('JWT_SECRET');
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+const JWT_REFRESH_SECRET = requireSecret('JWT_REFRESH_SECRET');
 
 /**
  * Middleware: Verify Auth Token & Enforce Tenant Isolation Scope

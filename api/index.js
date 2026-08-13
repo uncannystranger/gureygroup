@@ -1,6 +1,13 @@
 import app from '../backend/app.js';
 import { connectMongoDB } from '../backend/config/mongodb.js';
 
+// ─── Production Environment Validation (runs once on cold start) ─────────────
+const REQUIRED_ENV = ['MONGODB_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const missingEnv = REQUIRED_ENV.filter(key => !process.env[key]);
+if (missingEnv.length > 0) {
+  console.error(`[FATAL CONFIG] Missing required environment variables: ${missingEnv.join(', ')}. Configure these in Vercel Dashboard → Settings → Environment Variables.`);
+}
+
 export default async function handler(req, res) {
   try {
     if (process.env.MONGODB_URI) {

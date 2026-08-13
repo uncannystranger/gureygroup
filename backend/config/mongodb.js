@@ -10,7 +10,13 @@ export const mongoStatus = {
 };
 
 if (!MONGODB_URI) {
-  console.warn('[MongoDB Atlas] WARNING: MONGODB_URI environment variable is not set. Database features will be unavailable.');
+  const msg = '[FATAL CONFIG] MONGODB_URI environment variable is not set. Database features will be unavailable.';
+  console.error(msg);
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    throw new Error(msg);
+  } else {
+    console.warn('[MongoDB Atlas] WARNING: MONGODB_URI not set. Database unavailable in development.');
+  }
 }
 
 let cachedPromise = null;
