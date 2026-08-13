@@ -140,7 +140,10 @@ router.post('/google', async (req, res) => {
 
   } catch (error) {
     console.error('API Google Auth Error:', error);
-    res.status(500).json({ error: 'Internal Server Error during auth sync' });
+    res.status(500).json({
+      error: 'Internal Server Error during auth sync',
+      message: process.env.NODE_ENV === 'production' ? 'Authentication sync failed. Please try again.' : error.message,
+    });
   }
 });
 
@@ -167,7 +170,11 @@ router.get('/me', enforceTenantIsolation, async (req, res) => {
 
     res.json({ user, company, membership });
   } catch (error) {
-    res.status(401).json({ error: 'Session expired or invalid' });
+    console.error('API Auth Me Error:', error);
+    res.status(500).json({
+      error: 'Failed to resolve session context',
+      message: process.env.NODE_ENV === 'production' ? 'Unable to retrieve user workspace.' : error.message,
+    });
   }
 });
 

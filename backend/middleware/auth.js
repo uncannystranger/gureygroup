@@ -6,12 +6,11 @@ import Branch from '../models/Branch.js';
 dotenv.config({ path: '../.env' });
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'gurey_group_default_jwt_secret_fallback_key_2026';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'gurey_group_default_jwt_refresh_secret_fallback_key_2026';
 
-if (!JWT_SECRET) {
-  console.error('[Auth Middleware] FATAL: JWT_SECRET environment variable is not set.');
-  process.exit(1);
+if (!process.env.JWT_SECRET) {
+  console.warn('[Auth Middleware] WARNING: JWT_SECRET environment variable is not set. Using fallback secret.');
 }
 
 /**
@@ -97,7 +96,14 @@ export const enforceTenantIsolation = async (req, res, next) => {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Unauthorized: Access token has expired. Please refresh.' });
     }
-    return res.status(401).json({ error: 'Unauthorized: Invalid access token.' });
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Unauthorized: Invalid access token.' });
+    }
+    console.error('[Auth Middleware Error]', err);
+    return res.status(500).json({
+      error: 'Authentication verification service error',
+      message: process.env.NODE_ENV === 'production' ? 'Authentication failed due to internal service error.' : err.message,
+    });
   }
 };
 

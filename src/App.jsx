@@ -67,33 +67,79 @@ function MainAppContent() {
     return () => clearTimeout(loaderTimer.current);
   }, [authLoading]);
 
+  // Sync URL with auth state
   useEffect(() => {
-    if (!isProfileModalOpen) return undefined;
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') setIsProfileModalOpen(false);
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isProfileModalOpen]);
+    if (authLoading) return;
+    const path = window.location.pathname;
+    if (!isAuthenticated && path !== '/login' && !inviteToken) {
+      window.history.replaceState(null, '', '/login');
+    } else if (isAuthenticated && path === '/login') {
+      window.history.replaceState(null, '', '/');
+    }
+  }, [isAuthenticated, authLoading, inviteToken]);
 
-  // Global Keyboard Shortcuts Listener
+  // Global Keyboard Shortcuts & Navigation Listener
   useEffect(() => {
+    const isEditable = (el) => {
+      if (!el) return false;
+      const tag = el.tagName?.toUpperCase();
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+    };
+
     const handleKeyDown = (e) => {
-      // Ctrl+K or Cmd+K -> Open Search / Command Palette
+      // Esc key -> close overlays/modals
+      if (e.key === 'Escape') {
+        if (isSearchOpen) setIsSearchOpen(false);
+        if (isModalOpen) setIsModalOpen(false);
+        if (isProfileModalOpen) setIsProfileModalOpen(false);
+        if (mobileNavOpen) setMobileNavOpen(false);
+        return;
+      }
+
+      // Ctrl+K or Cmd+K -> Command Palette
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(prev => !prev);
+        return;
       }
-      // Ctrl+N or Cmd+N -> Open Add Product Modal
+      // Ctrl+N or Cmd+N -> Add Product
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         setIsModalOpen(true);
+        return;
+      }
+
+      // Keyboard scrolling when not typing in an editable field
+      if (!isEditable(document.activeElement)) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          window.scrollBy({ top: 120, behavior: 'smooth' });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          window.scrollBy({ top: -120, behavior: 'smooth' });
+        } else if (e.key === 'PageDown') {
+          e.preventDefault();
+          window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
+        } else if (e.key === 'PageUp') {
+          e.preventDefault();
+          window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+        } else if (e.key === ' ' || e.code === 'Space') {
+          e.preventDefault();
+          const dist = e.shiftKey ? -window.innerHeight * 0.8 : window.innerHeight * 0.8;
+          window.scrollBy({ top: dist, behavior: 'smooth' });
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isSearchOpen, isModalOpen, isProfileModalOpen, mobileNavOpen]);
 
   // 1. Full-screen Loading State during Startup Auth Verification
   if (inviteToken) {
@@ -111,15 +157,12 @@ function MainAppContent() {
         }}
       >
         <div className="flex flex-col items-center gap-5">
-          {/* Breathing logo orb */}
           <div
             className="w-14 h-14 rounded-3xl capsule-mesh-gradient flex items-center justify-center animate-session-orb"
             style={{ boxShadow: '0 0 40px rgba(99,102,241,0.45), 0 0 80px rgba(99,102,241,0.15)' }}
           >
             <Sparkles className="w-7 h-7 text-white" style={{ filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.8))' }} />
           </div>
-
-          {/* Staggered floating dots — no text */}
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/70 animate-dot-stagger-1" />
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/70 animate-dot-stagger-2" />

@@ -16,8 +16,11 @@ router.post('/', async (req, res) => {
     const companyId = req.tenantId;
     const { device, browser, os, userName, location, remembered } = req.body;
 
-    // Deactivate previous sessions for this user (optional: keep multiple active)
-    // await Session.updateMany({ userId: uid, isActive: true }, { isActive: false, logoutTime: new Date() });
+    // Deactivate stale active sessions for this user on the same device/browser
+    await Session.updateMany(
+      { userId: uid, companyId, isActive: true },
+      { $set: { isActive: false, logoutTime: new Date() } }
+    );
 
     const session = await Session.create({
       userId: uid,
@@ -30,6 +33,7 @@ router.post('/', async (req, res) => {
       location: location || 'Unknown',
       remembered: !!remembered,
       loginTime: new Date(),
+      lastActive: new Date(),
       isActive: true,
     });
 
@@ -53,7 +57,9 @@ router.post('/heartbeat', async (req, res) => {
       ? { _id: sessionId }
       : { userId: uid, isActive: true };
 
-    await Session.findOneAndUpdate(filter, { lastActive: new Date() });
+    await Session.updateMany(filter, {
+      $set: { lastActive: new Date(), isActive: true }
+    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update heartbeat.' });
@@ -123,6 +129,22 @@ router.post('/logout-other-devices', async (req, res) => {
 router.get('/active', requirePermission('sessions:view'), async (req, res) => {
   try {
     const companyId = req.tenantId;
+
+    // Prune stale sessions where lastActive is older than 5 minutes
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+    await Session.updateMany(
+      {
+        companyId,
+        isActive: true,
+        $or: [
+          { lastActive: { $lt: cutoff } },
+          { lastActive: { $exists: false }, loginTime: { $lt: cutoff } },
+          { lastActive: null, loginTime: { $lt: cutoff } }
+        ]
+      },
+      { $set: { isActive: false, logoutTime: new Date() } }
+    );
+
     const sessions = await Session.find({ companyId, isActive: true })
       .sort({ lastActive: -1 });
 

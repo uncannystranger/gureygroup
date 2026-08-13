@@ -2,9 +2,11 @@ import React from 'react';
 import { Printer, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLanguage } from '../../localization/LanguageContext';
+import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 
 export default function ReceiptModal({ isOpen, onClose, sale }) {
   const { t, formatDate } = useLanguage();
+  const { activeCompany } = useMultiTenant();
 
   if (!isOpen || !sale) return null;
 
@@ -33,7 +35,15 @@ export default function ReceiptModal({ isOpen, onClose, sale }) {
         {/* Printable Receipt Paper layout */}
         <div id="printable-receipt" className="bg-amber-50/60 dark:bg-slate-950 p-5 rounded-3xl border border-amber-200/80 dark:border-slate-800 font-mono text-xs space-y-3 text-slate-800 dark:text-slate-200 shadow-inner">
           <div className="text-center space-y-1 pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
-            <h2 className="font-extrabold text-sm uppercase tracking-widest text-slate-900 dark:text-white">Gurey Group</h2>
+            {activeCompany?.logo && (
+              <img src={activeCompany.logo} alt={activeCompany.name} className="w-10 h-10 rounded-xl mx-auto object-cover mb-1" />
+            )}
+            <h2 className="font-extrabold text-sm uppercase tracking-widest text-slate-900 dark:text-white">
+              {activeCompany?.name || 'Company Receipt'}
+            </h2>
+            {activeCompany?.address && <p className="text-[10px] text-slate-500">{activeCompany.address}</p>}
+            {activeCompany?.phone && <p className="text-[10px] text-slate-500">Tel: {activeCompany.phone}</p>}
+            {activeCompany?.taxNumber && <p className="text-[10px] text-slate-500">Tax ID: {activeCompany.taxNumber}</p>}
             {sale.receiptSettings?.showBranch !== false && <p className="text-[10px] text-slate-500">{sale.branchName || 'Branch'} • POS {sale.posTerminalId || 'web-pos'}</p>}
             <div className="pt-1 text-[10px] font-bold text-indigo-500">{t('pos.receipt_preview', 'RECEIPT')}: {sale.receiptNumber}</div>
             <div className="text-[10px] font-bold text-slate-500">Invoice: {sale.invoiceNumber}</div>

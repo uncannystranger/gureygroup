@@ -206,7 +206,10 @@ router.post('/auth/employee-login', async (req, res) => {
     res.json({ token, organization, user: { uid: employee.employeeId, email: employee.email, displayName: employee.displayName, photoURL: employee.photoURL, accountType: 'employee', authType: 'employee', emailVerified: true, requiresEmailVerification: false, role: membership.role, permissions: membership.permissions || [], companyId: membership.companyId } });
   } catch (error) {
     console.error('Employee Login Error:', error);
-    res.status(500).json({ error: 'Employee login is temporarily unavailable.' });
+    res.status(500).json({
+      error: 'Employee login error',
+      message: process.env.NODE_ENV === 'production' ? 'Employee login is temporarily unavailable.' : error.message,
+    });
   }
 });
 

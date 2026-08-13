@@ -25,9 +25,11 @@ import { useAuth } from '../../core/auth/AuthContext';
 export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, currentTab, onToggleMobileNav }) {
   const { darkMode, setThemeMode, themeMode } = useTheme();
   const { profile, showToast } = useUserProfile();
-  const { notifications, markAllNotificationsRead, clearNotifications, branches, activeBranch, activeBranchId, setActiveBranchId } = useMultiTenant();
+  const { notifications, markAllNotificationsRead, clearNotifications, branches, activeBranch, activeBranchId, setActiveBranchId, activeCompany } = useMultiTenant();
   const { language, setLanguage, t } = useLanguage();
-  const { logout } = useAuth();
+  const { logout, tenantCompany } = useAuth();
+
+  const currentCompany = activeCompany || tenantCompany;
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -97,9 +99,12 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
               </p>
             </div>
           ) : (
-            <div>
+            <div className="flex items-center gap-2">
+              {currentCompany?.logo ? (
+                <img src={currentCompany.logo} alt={currentCompany.name || 'Company logo'} className="w-7 h-7 rounded-lg object-cover" />
+              ) : null}
               <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                {profile.businessName || 'Gurey Group'}
+                {currentCompany?.name || profile.businessName || 'Business Workspace'}
               </h1>
             </div>
           )}

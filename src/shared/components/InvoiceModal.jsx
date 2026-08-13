@@ -25,13 +25,25 @@ export default function InvoiceModal({ isOpen, onClose, sale }) {
           
           {/* Invoice Header */}
           <div className="flex items-start justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
-            <div>
-              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-indigo-500" />
-                {activeCompany?.name || 'Gurey Group HQ'}
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">Commercial Sales & Retail Operations</p>
-              <p className="text-xs text-slate-500">TAX ID: US-984019284 • VAT #: 8590123</p>
+            <div className="flex items-start gap-3">
+              {activeCompany?.logo ? (
+                <img src={activeCompany.logo} alt={activeCompany.name} className="w-12 h-12 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-sm" />
+              ) : (
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-indigo-500" />
+                </div>
+              )}
+              <div>
+                <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {activeCompany?.name || 'Company Invoice'}
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">{activeCompany?.address || activeCompany?.businessType || 'Commercial Operations'}</p>
+                <p className="text-xs text-slate-500">
+                  {activeCompany?.taxNumber ? `TAX ID: ${activeCompany.taxNumber}` : ''} 
+                  {activeCompany?.phone ? ` • Tel: ${activeCompany.phone}` : ''}
+                  {activeCompany?.email ? ` • Email: ${activeCompany.email}` : ''}
+                </p>
+              </div>
             </div>
             <div className="text-right">
               <span className="px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 text-xs font-black uppercase tracking-wider">

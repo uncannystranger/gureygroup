@@ -58,7 +58,8 @@ export default function ReportsScreen() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `GureyGroup_${selectedReport}_Report_${Date.now()}.csv`);
+    const companyNameClean = (activeCompany?.name || 'Business').replace(/[^a-zA-Z0-9]/g, '_');
+    link.setAttribute("download", `${companyNameClean}_${selectedReport}_Report_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

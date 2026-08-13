@@ -54,7 +54,7 @@ export default function MonthlyReportModal({ isOpen, onClose }) {
                 </span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                {tenant?.name || 'Gurey Group Enterprise'} • Prepared for {profile?.displayName || 'Executive Management'}
+                {tenant?.name || 'Company Workspace'} • Prepared for {profile?.displayName || 'Executive Management'}
               </p>
             </div>
           </div>

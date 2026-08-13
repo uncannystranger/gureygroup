@@ -41,6 +41,7 @@ export const REGISTERED_API_ROUTES = [
 
 // Strict Helmet Configuration (Anti-Clickjacking, HSTS, Content Security Policy)
 app.use(helmet({
+  hidePoweredBy: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -61,11 +62,11 @@ app.use(express.json({ limit: '5mb' }));
 // Global Security Shield (Injection, XSS, Path Traversal Sanitizer & Threat Logger)
 app.use(securityShieldMiddleware);
 
-// Strict Auth Endpoint Brute-Force Rate Limiter
+// Auth Endpoint Rate Limiter
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 15,
-  message: { error: 'Security Protection: Too many login/authentication attempts from this IP. Please try again in 15 minutes.' }
+  max: IS_PROD ? 30 : 500,
+  message: { error: 'Too many login/authentication attempts from this IP. Please try again in 15 minutes.' }
 });
 app.use('/api/auth', authLimiter);
 app.use('/api/team/auth/employee-login', authLimiter);
@@ -74,7 +75,7 @@ app.use('/api/team/invitations/accept', authLimiter);
 // General API Rate Limiter
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 350,
+  max: IS_PROD ? 350 : 2000,
   message: { error: 'Too many API requests from this IP, please try again later.' }
 });
 app.use('/api', apiLimiter);

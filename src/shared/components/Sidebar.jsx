@@ -29,9 +29,11 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenProfile, mobile
   const { activePreset, darkMode, setThemeMode, themeMode } = useTheme();
   const { t, language, setLanguage } = useLanguage();
   const { profile } = useUserProfile();
-  const { branches, activeBranchId, setActiveBranchId } = useMultiTenant();
-  const { logout } = useAuth();
+  const { branches, activeBranchId, setActiveBranchId, activeCompany } = useMultiTenant();
+  const { logout, tenantCompany } = useAuth();
   const { hasPermission } = useRBAC();
+
+  const currentCompany = activeCompany || tenantCompany;
 
   const navItems = [
     { id: 'general', labelKey: 'nav.dashboard', defaultLabel: 'Dashboard', icon: Building2 },
@@ -132,12 +134,16 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenProfile, mobile
           {/* Drawer Header with App Brand & Close Button */}
           <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl capsule-mesh-gradient flex items-center justify-center shadow-md">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <h2 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">Gurey Group</h2>
-                <p className="text-[10px] text-slate-400 font-medium">Enterprise SaaS</p>
+              {currentCompany?.logo ? (
+                <img src={currentCompany.logo} alt={currentCompany.name || 'Company logo'} className="w-9 h-9 rounded-2xl object-cover shadow-md" />
+              ) : (
+                <div className="w-9 h-9 rounded-2xl capsule-mesh-gradient flex items-center justify-center shadow-md">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <h2 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight truncate">{currentCompany?.name || 'Workspace'}</h2>
+                <p className="text-[10px] text-slate-400 font-medium">{currentCompany?.businessType || 'Business Workspace'}</p>
               </div>
             </div>
             <button

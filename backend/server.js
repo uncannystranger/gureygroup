@@ -8,7 +8,7 @@ const PORT = BACKEND_PORT;
 // Initialize MongoDB & Start Express Server
 connectMongoDB().then(async () => {
   await runMigrations();
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Gurey Group Backend Server] Running on port ${PORT}`);
     console.log(`[Gurey Group Backend Server] Listening: http://127.0.0.1:${PORT}`);
     console.log(`[Gurey Group Backend Server] Environment: ${process.env.NODE_ENV || 'development'}`);

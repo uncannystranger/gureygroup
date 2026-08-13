@@ -18,6 +18,8 @@ export default function OrganizationSettingsScreen() {
   const [success, setSuccess] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
+    logo: '',
+    taxNumber: '',
     industry: '',
     website: '',
     email: '',
@@ -40,7 +42,9 @@ export default function OrganizationSettingsScreen() {
       if (res.organization) {
         setFormData({
           name: res.organization.name || '',
-          industry: res.organization.industry || '',
+          logo: res.organization.logo || '',
+          taxNumber: res.organization.taxNumber || '',
+          industry: res.organization.businessType || res.organization.industry || '',
           website: res.organization.website || '',
           email: res.organization.email || '',
           phone: res.organization.phone || '',
@@ -48,8 +52,8 @@ export default function OrganizationSettingsScreen() {
           city: res.organization.city || '',
           country: res.organization.country || '',
           description: res.organization.description || '',
-          currency: res.organization.settings?.currency || 'USD',
-          timezone: res.organization.settings?.timezone || 'UTC',
+          currency: res.organization.currency || res.organization.settings?.currency || 'USD',
+          timezone: res.organization.timezone || res.organization.settings?.timezone || 'UTC',
         });
       }
     } catch (err) {
@@ -64,12 +68,32 @@ export default function OrganizationSettingsScreen() {
     setSaving(true);
     setError(null);
     try {
-      await organizationAPI.update({
+      const res = await organizationAPI.update({
         ...formData,
+        businessType: formData.industry,
         settings: { currency: formData.currency, timezone: formData.timezone },
       });
-      setSuccess('Organization updated successfully!');
-      setTimeout(() => setSuccess(null), 3000);
+      const updatedOrg = res.organization || { ...company, ...formData };
+      
+      // Update cached tenant company
+      const updatedCompany = {
+        ...company,
+        ...updatedOrg,
+        id: company?.id || updatedOrg.companyId,
+        name: updatedOrg.name,
+        logo: updatedOrg.logo,
+        phone: updatedOrg.phone,
+        address: updatedOrg.address,
+        taxNumber: updatedOrg.taxNumber,
+        email: updatedOrg.email
+      };
+      localStorage.setItem('gurey_tenant_company', JSON.stringify(updatedCompany));
+      
+      setSuccess('Organization profile and branding updated successfully!');
+      setTimeout(() => {
+        setSuccess(null);
+        window.location.reload();
+      }, 1000);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -109,13 +133,41 @@ export default function OrganizationSettingsScreen() {
         {/* Company Info */}
         <div className="glass-panel rounded-4xl p-6">
           <h3 className="text-sm font-extrabold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <Building className="w-4 h-4 text-indigo-500" /> Company Information
+            <Building className="w-4 h-4 text-indigo-500" /> Company Information & Branding
           </h3>
           <div className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Company Name</label>
-              <input value={formData.name} onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))} disabled={!canEdit} className="w-full px-4 py-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
+            <div className="flex items-center gap-4">
+              {formData.logo ? (
+                <img src={formData.logo} alt="Company logo preview" className="w-14 h-14 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-md" />
+              ) : (
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-500 font-bold text-xs">
+                  Logo
+                </div>
+              )}
+              <div className="flex-1">
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Company Logo URL</label>
+                <input 
+                  type="url" 
+                  placeholder="https://example.com/logo.png" 
+                  value={formData.logo} 
+                  onChange={(e) => setFormData(f => ({ ...f, logo: e.target.value }))} 
+                  disabled={!canEdit} 
+                  className="w-full px-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" 
+                />
+              </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Company Name</label>
+                <input value={formData.name} onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))} disabled={!canEdit} className="w-full px-4 py-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Tax Registration / VAT ID</label>
+                <input placeholder="e.g. TAX-984019284" value={formData.taxNumber} onChange={(e) => setFormData(f => ({ ...f, taxNumber: e.target.value }))} disabled={!canEdit} className="w-full px-4 py-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
+              </div>
+            </div>
+
             <div>
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Industry</label>
               <select value={formData.industry} onChange={(e) => setFormData(f => ({ ...f, industry: e.target.value }))} disabled={!canEdit} className="w-full px-4 py-3 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-white font-bold text-sm focus:outline-none appearance-none disabled:opacity-50">

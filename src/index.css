@@ -6,6 +6,8 @@
   html {
     min-width: 320px;
     overflow-x: hidden;
+    overflow-y: auto;
+    scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
   }
 
@@ -13,7 +15,9 @@
     font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     min-width: 320px;
     overflow-x: hidden;
-    overscroll-behavior-y: none;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   #root { min-height: 100dvh; }

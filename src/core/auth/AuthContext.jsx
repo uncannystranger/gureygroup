@@ -176,7 +176,7 @@ export function AuthProvider({ children }) {
             localStorage.removeItem('gurey_auth_token');
             localStorage.removeItem('gurey_auth_user');
             localStorage.removeItem('gurey_tenant_company');
-            setAuthError('Authentication service is unavailable. Please try again when the backend is reachable.');
+            setAuthError(err.message || 'Authentication service is unavailable. Please try again when the backend is reachable.');
           }
         } else {
           const storedToken = localStorage.getItem('gurey_auth_token');
@@ -237,6 +237,18 @@ export function AuthProvider({ children }) {
     } else {
       localStorage.removeItem('gurey_auth_user');
     }
+  }, [currentUser]);
+
+  // Periodic session heartbeat (every 60s when logged in)
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    const sendHeartbeat = () => {
+      const sessionId = sessionStorage.getItem('gurey_current_session_id');
+      sessionAPI.heartbeat(sessionId).catch(() => {});
+    };
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 60000);
+    return () => clearInterval(interval);
   }, [currentUser]);
 
   useEffect(() => {
