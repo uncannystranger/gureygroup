@@ -1,6 +1,7 @@
 <div align="center">
 
-  <img width="1440" height="702" alt="Screenshot 2026-08-03 at 22 01 55" src="https://github.com/user-attachments/assets/fdb58673-d993-4cf6-a2b8-32d10442f9f0" />
+ <img width="1440" height="672" alt="Screenshot 2026-08-22 at 11 08 24" src="https://github.com/user-attachments/assets/ee980b1b-8529-4741-a1e8-2705853db06f" />
+
 
   # ◈ GUREY GROUP // OPERATING SYSTEM FOR MODERN COMMERCE
 
