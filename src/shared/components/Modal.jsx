@@ -33,7 +33,7 @@ export default function Modal({
 
   return (
     <div
-      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-6 bg-slate-900/70 backdrop-blur-md animate-fade-in"
+      className="modal-overlay glass-scrim fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-6 animate-fade-in"
       role="presentation"
       onMouseDown={(event) => {
         if (closeOnOverlay && event.target === event.currentTarget) onClose();
@@ -43,7 +43,7 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={`w-full min-w-0 ${className} glass-panel rounded-3xl sm:rounded-4xl p-5 sm:p-8 relative shadow-2xl border border-white/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto overscroll-contain animate-fade-scale`}
+        className={`w-full min-w-0 ${className} glass glass-strong rounded-2xl sm:rounded-3xl p-5 sm:p-7 relative max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto overscroll-contain animate-fade-scale`}
         onMouseDown={(event) => event.stopPropagation()}
       >
         {showClose && (

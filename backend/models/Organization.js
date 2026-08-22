@@ -23,6 +23,16 @@ const organizationSchema = new mongoose.Schema({
     lowStockThreshold: { type: Number, default: 10 },
     enableTax:         { type: Boolean, default: true },
     defaultTaxRate:    { type: Number, default: 0 },
+    // Mobile-money merchant number used by the QR payment flow. Previously a
+    // hardcoded default in frontend source with a localStorage override, so it
+    // was neither per-workspace nor durable.
+    merchantNumber:    { type: String, default: '' },
+    receipt: {
+      showCashierName: { type: Boolean, default: true },
+      showEmployeeId:  { type: Boolean, default: false },
+      showBranch:      { type: Boolean, default: true },
+      showCashierRole: { type: Boolean, default: false },
+    },
   },
   status: { type: String, enum: ['Active', 'Suspended', 'Deleted'], default: 'Active' },
 }, {

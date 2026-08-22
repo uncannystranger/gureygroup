@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { organizationAPI } from '../../services/apiService';
+import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { 
   User, 
   Sliders, 
@@ -12,14 +14,13 @@ import {
   QrCode,
   CheckCircle2
 } from 'lucide-react';
-import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
 import EditProfileTab from './components/EditProfileTab';
 import PreferencesTab from './components/PreferencesTab';
 import SecurityTab from './components/SecurityTab';
 
 export default function SettingsScreen({ initialTab }) {
-  const { activeCompany, activeCompanyId } = useMultiTenant();
+  const { activeCompany, activeCompanyId, refreshWorkspace } = useMultiTenant();
   const { t } = useLanguage();
 
   const isProfilePage = initialTab === 'profile';
@@ -27,16 +28,32 @@ export default function SettingsScreen({ initialTab }) {
     return isProfilePage ? 'profile' : 'preferences';
   });
 
-  // Mobile Money merchant number — persisted to localStorage
-  const [merchantNumber, setMerchantNumber] = useState(() => {
-    try { return localStorage.getItem('gurey_merchant_number') || '615283292'; } catch { return '615283292'; }
-  });
+  // Mobile Money merchant number — workspace configuration on the organization
+  // record, so it applies to every device and every cashier.
+  const [merchantNumber, setMerchantNumber] = useState(activeCompany?.merchantNumber || '');
   const [merchantSaved, setMerchantSaved] = useState(false);
+  const [merchantError, setMerchantError] = useState(null);
+  const [savingMerchant, setSavingMerchant] = useState(false);
 
-  const saveMerchantNumber = () => {
-    try { localStorage.setItem('gurey_merchant_number', merchantNumber.trim()); } catch {}
-    setMerchantSaved(true);
-    setTimeout(() => setMerchantSaved(false), 2500);
+  useEffect(() => {
+    setMerchantNumber(activeCompany?.merchantNumber || '');
+  }, [activeCompany?.merchantNumber]);
+
+  const saveMerchantNumber = async () => {
+    setMerchantError(null);
+    setSavingMerchant(true);
+    try {
+      await organizationAPI.update({
+        settings: { ...(activeCompany?.settings || {}), merchantNumber: merchantNumber.trim() },
+      });
+      await refreshWorkspace?.();
+      setMerchantSaved(true);
+      setTimeout(() => setMerchantSaved(false), 2500);
+    } catch (err) {
+      setMerchantError(err.message || 'Could not save the merchant number.');
+    } finally {
+      setSavingMerchant(false);
+    }
   };
 
   useEffect(() => {

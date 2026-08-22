@@ -1,298 +1,162 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../core/auth/AuthContext';
-import { 
-  Mail, 
-  ShieldAlert, 
-  RefreshCw, 
-  ArrowLeft, 
-  CheckCircle2, 
+import {
+  Mail,
+  RefreshCw,
+  CheckCircle2,
   AlertCircle,
-  KeyRound,
-  Edit3,
   Send,
   LogOut,
-  Sparkles
+  Sparkles,
+  Inbox,
 } from 'lucide-react';
 
+/**
+ * Shown when the server reports the signed-in account's address is not yet
+ * confirmed. This screen cannot grant access on its own — the API refuses
+ * business data until the backend record flips, so it only drives the flow.
+ */
 export default function VerifyEmailScreen() {
-  const { 
-    currentUser, 
-    resendVerificationEmail, 
-    changeUserEmail, 
-    checkEmailVerificationStatus, 
-    verifyOtpCode,
-    logout 
+  const {
+    currentUser,
+    emailVerification,
+    requestVerificationEmail,
+    refreshVerificationStatus,
+    logout,
   } = useAuth();
 
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendSuccess, setResendSuccess] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(null);
-  const [isChecking, setIsChecking] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  
-  // Change email modal / state
-  const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [newEmail, setNewEmail] = useState(currentUser?.email || '');
-  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [sending, setSending] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [error, setError] = useState(null);
+  const [devLink, setDevLink] = useState(null);
 
-  // Cooldown countdown timer
+  const email = emailVerification?.email || currentUser?.email;
+
   useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown(c => c - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
+    if (cooldown <= 0) return undefined;
+    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
-  const handleResend = async () => {
-    if (resendCooldown > 0) return;
-    setErrorMsg(null);
-    try {
-      await resendVerificationEmail();
-      setResendSuccess(true);
-      setResendCooldown(60);
-      setTimeout(() => setResendSuccess(false), 5000);
-    } catch (err) {
-      setErrorMsg(err.message || 'Failed to resend verification email.');
-    }
-  };
+  // The link is opened in another tab or on a phone, so poll gently rather
+  // than making the user hunt for a "check again" button.
+  useEffect(() => {
+    const interval = setInterval(() => { refreshVerificationStatus(); }, 10000);
+    return () => clearInterval(interval);
+  }, [refreshVerificationStatus]);
 
-  const handleCheckStatus = async () => {
-    setIsChecking(true);
-    setErrorMsg(null);
+  const handleSend = useCallback(async () => {
+    if (cooldown > 0 || sending) return;
+    setSending(true);
+    setError(null);
+    setNotice(null);
     try {
-      const isVerified = await checkEmailVerificationStatus();
-      if (!isVerified) {
-        setErrorMsg('Your email is still unverified. Please click the link in your verification email or try again.');
+      const result = await requestVerificationEmail();
+      if (result.alreadyVerified) {
+        setNotice('That address is already confirmed — loading your workspace.');
+        return;
       }
+      setCooldown(60);
+      setNotice(
+        result.delivered
+          ? `We sent a confirmation link to ${result.email}. It expires in 24 hours.`
+          : `A confirmation link was created for ${result.email}. Email delivery is not configured on this server, so use the link below.`
+      );
+      if (result.devLink) setDevLink(result.devLink);
     } catch (err) {
-      setErrorMsg(err.message || 'Verification status check failed.');
+      setError(err.message || 'We could not send that email. Please try again shortly.');
     } finally {
-      setIsChecking(false);
+      setSending(false);
     }
-  };
+  }, [cooldown, sending, requestVerificationEmail]);
 
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setErrorMsg(null);
-    if (!otpCode || otpCode.trim().length !== 6) {
-      setErrorMsg('Please enter a valid 6-digit OTP verification code.');
-      return;
+  const handleCheck = async () => {
+    setChecking(true);
+    setError(null);
+    const status = await refreshVerificationStatus();
+    if (status && !status.emailVerified) {
+      setError('Not confirmed yet. Open the link in the email, then check again.');
     }
-    try {
-      await verifyOtpCode(otpCode);
-    } catch (err) {
-      setErrorMsg(err.message || 'Invalid OTP verification code.');
-    }
-  };
-
-  const handleChangeEmailSubmit = async (e) => {
-    e.preventDefault();
-    if (!newEmail || !newEmail.includes('@')) {
-      setErrorMsg('Please enter a valid email address.');
-      return;
-    }
-    setIsUpdatingEmail(true);
-    setErrorMsg(null);
-    try {
-      await changeUserEmail(newEmail);
-      setIsEditingEmail(false);
-      setResendSuccess(true);
-      setResendCooldown(60);
-    } catch (err) {
-      setErrorMsg(err.message || 'Failed to update email address.');
-    } finally {
-      setIsUpdatingEmail(false);
-    }
+    setChecking(false);
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col justify-between bg-[#EBF0F7] dark:bg-[#0B0F17] text-slate-800 dark:text-slate-100 relative overflow-hidden transition-colors duration-300">
-      
-      {/* Background Decorative Glow Nodes */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-amber-500/20 dark:bg-amber-600/15 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute top-1/2 -right-40 w-96 h-96 bg-indigo-500/20 dark:bg-indigo-600/15 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-blue-500/20 dark:bg-blue-600/15 rounded-full blur-[100px] pointer-events-none" />
+    <div className="ds-app-shell min-h-screen w-full flex flex-col items-center justify-center px-4 py-10 relative overflow-hidden">
+      <div className="absolute -top-[20%] left-[15%] w-[540px] h-[540px] rounded-full blur-[150px] pointer-events-none bg-[var(--ds-accent)] opacity-[0.10] dark:opacity-[0.16]" />
 
-      {/* Top Bar - Clean Logo Only */}
-      <header className="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl capsule-mesh-gradient flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
+      <main className="relative w-full max-w-md">
+        <div className="flex flex-col items-center text-center mb-6">
+          <span className="w-11 h-11 rounded-2xl capsule-mesh-gradient grid place-items-center mb-3">
+            <Sparkles className="w-5 h-5 text-white" aria-hidden="true" />
+          </span>
+          <h1 className="ds-display text-2xl">Confirm your email</h1>
+          <p className="ds-body mt-2 max-w-sm">
+            One step before your workspace opens. We need to know this address reaches you.
+          </p>
         </div>
-      </header>
 
-      {/* Main Verification Card */}
-      <main className="w-full max-w-lg mx-auto px-4 my-auto z-10 animate-fade-scale">
-        <div className="glass-panel rounded-3xl p-8 shadow-2xl relative border border-white/60 dark:border-white/10 space-y-6">
-          
-          {/* Header Icon & Title */}
-          <div className="text-center space-y-3">
-            <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-500 mx-auto flex items-center justify-center shadow-inner">
-              <Mail className="w-8 h-8 animate-bounce" />
-            </div>
-
-            <div>
-              <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                Verify Your Email Address
-              </h1>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-                Your email has not been verified yet. Please verify your email before continuing to access the platform.
-              </p>
-            </div>
-
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-200/70 dark:bg-slate-800/80 border border-slate-300/60 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200">
-              <Mail className="w-3.5 h-3.5 text-indigo-500" />
-              <span>{currentUser?.email}</span>
-              <button 
-                onClick={() => setIsEditingEmail(!isEditingEmail)}
-                className="text-indigo-600 dark:text-indigo-400 hover:underline text-[11px] ml-1 flex items-center gap-0.5"
-                title="Change Email Address"
-              >
-                <Edit3 className="w-3 h-3" /> Edit
-              </button>
+        <section className="glass glass-strong rounded-3xl p-6 sm:p-7">
+          <div className="flex items-start gap-3 p-3.5 rounded-2xl" style={{ background: 'var(--ds-accent-soft)' }}>
+            <Mail className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--ds-accent)' }} aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="ds-caption">Confirmation will be sent to</p>
+              <p className="ds-heading break-all">{email}</p>
             </div>
           </div>
 
-          {/* Change Email Form Modal Inline */}
-          {isEditingEmail && (
-            <form onSubmit={handleChangeEmailSubmit} className="p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-3 animate-fade-in-up">
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Edit3 className="w-3.5 h-3.5 text-indigo-500" /> Change Email Address
-              </h4>
-              <div className="relative">
-                <input
-                  type="email"
-                  required
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="Enter new email..."
-                  className="w-full pl-3 pr-4 py-2 text-xs rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none"
-                />
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsEditingEmail(false)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUpdatingEmail}
-                  className="px-4 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs shadow-sm hover:bg-indigo-700 btn-micro flex items-center gap-1"
-                >
-                  {isUpdatingEmail ? 'Saving...' : 'Update & Resend'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Error Banner */}
-          {errorMsg && (
-            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-start gap-2.5 animate-fade-in-up">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium">{errorMsg}</div>
-            </div>
-          )}
-
-          {/* Resend Success Banner */}
-          {resendSuccess && (
-            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-start gap-2.5 animate-fade-in-up">
-              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium">Verification email dispatched! Check your inbox or spam folder.</div>
-            </div>
-          )}
-
-          {/* Verification Method 1: Click Email Link */}
-          <div className="p-4 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-3">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <Send className="w-3.5 h-3.5 text-indigo-500" /> Option 1: Verification Link
-            </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              We sent a verification link to your inbox. Click the link in the email, then return here and click <strong>I've Verified My Email</strong> below.
+          {notice && (
+            <p className="ds-body mt-4 flex items-start gap-2 animate-fade-in-up" role="status">
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--ds-positive)' }} aria-hidden="true" />
+              <span>{notice}</span>
             </p>
+          )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleCheckStatus}
-                disabled={isChecking}
-                className="py-2.5 px-3 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-md hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 btn-micro"
-              >
-                {isChecking ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4" />
-                )}
-                <span>I've Verified My Email</span>
-              </button>
+          {error && (
+            <p className="ds-body mt-4 flex items-start gap-2 animate-fade-in-up" role="alert">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--ds-critical)' }} aria-hidden="true" />
+              <span style={{ color: 'var(--ds-critical)' }}>{error}</span>
+            </p>
+          )}
 
-              <button
-                type="button"
-                onClick={handleResend}
-                disabled={resendCooldown > 0}
-                className="py-2.5 px-3 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 btn-micro"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${resendCooldown > 0 ? '' : 'text-indigo-500'}`} />
-                <span>
-                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Email'}
-                </span>
-              </button>
+          {devLink && (
+            <div className="mt-4 p-3 rounded-xl ds-surface-sunken">
+              <p className="ds-caption mb-1.5">Development link (SMTP not configured on this server)</p>
+              <a href={devLink} className="ds-link text-xs break-all">{devLink}</a>
             </div>
-          </div>
+          )}
 
-          {/* Verification Method 2: OTP Code Verification */}
-          <div className="p-4 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-3">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-indigo-500" /> Option 2: Enter OTP Code
-            </h3>
-            <form onSubmit={handleVerifyOtp} className="flex gap-2">
-              <input
-                type="text"
-                maxLength={6}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="6-digit OTP code"
-                className="flex-1 pl-3 pr-3 py-2 text-xs rounded-xl bg-slate-100/80 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-bold text-xs shadow-md hover:scale-105 transition-all btn-micro shrink-0"
-              >
-                Verify Code
-              </button>
-            </form>
-          </div>
-
-          {/* Back to Login / Sign Out Button */}
-          <div className="pt-2 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center justify-between text-xs">
+          <div className="mt-5 grid gap-2.5">
             <button
-              onClick={logout}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white font-semibold transition-colors"
+              type="button"
+              onClick={handleSend}
+              disabled={sending || cooldown > 0}
+              className="ds-btn ds-btn-primary w-full"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to Login</span>
+              <Send className={`w-4 h-4 ${sending ? 'animate-pulse' : ''}`} aria-hidden="true" />
+              {cooldown > 0 ? `Resend in ${cooldown}s` : sending ? 'Sending…' : 'Send confirmation link'}
             </button>
 
-            <button
-              onClick={logout}
-              className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold hover:underline"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Sign Out</span>
+            <button type="button" onClick={handleCheck} disabled={checking} className="ds-btn ds-btn-secondary w-full">
+              <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} aria-hidden="true" />
+              {checking ? 'Checking…' : "I've confirmed it"}
             </button>
           </div>
 
-        </div>
+          <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--ds-border)' }}>
+            <p className="ds-caption flex items-start gap-2">
+              <Inbox className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>Nothing arrived? Check spam, then resend. Each new link replaces the previous one.</span>
+            </p>
+          </div>
+        </section>
+
+        <button type="button" onClick={logout} className="ds-btn ds-btn-ghost ds-btn-sm w-full mt-4">
+          <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+          Sign out
+        </button>
       </main>
-
-      {/* Footer */}
-      <footer className="w-full text-center py-6 text-xs text-slate-400 dark:text-slate-600 z-10">
-        <span>Made with </span><span className="text-orange-500" aria-label="love">🧡</span><span> by uncannystranger</span>
-      </footer>
-
     </div>
   );
 }

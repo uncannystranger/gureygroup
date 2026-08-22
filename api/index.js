@@ -18,11 +18,10 @@ export default async function handler(req, res) {
       url: req.url,
       method: req.method,
     });
+    // Internal failure details stay in the platform logs above, never in the
+    // response body.
     return res.status(500).json({
-      error: 'Serverless Function Execution Error',
-      message: err.message,
-      route: req.url,
-      method: req.method,
+      error: 'Internal server error',
       timestamp: new Date().toISOString(),
     });
   }

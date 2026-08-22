@@ -159,7 +159,7 @@ export default function ReportsScreen() {
           <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
             <AnimatedCounter value={totalTaxCollected} prefix="$" decimals={2} />
           </p>
-          <span className="text-[10px] font-bold text-slate-400 mt-1 block">Tax Rate: {activeCompany?.taxRate}%</span>
+          <span className="text-[10px] font-bold text-slate-400 mt-1 block">Tax Rate: {Number(activeCompany?.taxRate ?? 0).toFixed(2)}%</span>
         </div>
 
         <div className="glass-panel rounded-3xl p-4 card-hover-lift">
@@ -192,29 +192,29 @@ export default function ReportsScreen() {
         {/* Report 1: Sales & Revenue */}
         {selectedReport === 'Sales' && (
           <div className="responsive-table-wrapper">
-            <table className="w-full text-left text-xs font-semibold">
+            <table className="ds-table">
               <thead>
-                <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">
-                  <th className="pb-3">Receipt Number</th>
-                  <th className="pb-3">{t('pos.select_customer', 'Customer')}</th>
-                  <th className="pb-3">{t('common.date', 'Date')}</th>
-                  <th className="pb-3">{t('pos.payment_method', 'Payment Method')}</th>
-                  <th className="pb-3">{t('common.tax', 'Tax')}</th>
-                  <th className="pb-3 text-right">{t('common.total', 'Total Amount')}</th>
+                <tr>
+                  <th>Receipt Number</th>
+                  <th>{t('common.customer', 'Customer')}</th>
+                  <th>{t('common.date', 'Date')}</th>
+                  <th>{t('pos.payment_method', 'Payment Method')}</th>
+                  <th>{t('common.tax', 'Tax')}</th>
+                  <th className="text-right">{t('common.total', 'Total Amount')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200/40 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+              <tbody>
                 {sales.length === 0 ? (
-                  <tr><td colSpan="6" className="py-8 text-center text-xs font-semibold text-slate-400">No sales recorded yet. Your sales analytics will appear once transactions begin.</td></tr>
+                  <tr><td colSpan="6" className="py-10 text-center">No sales recorded yet. Your sales analytics will appear once transactions begin.</td></tr>
                 ) : (
                   sales.map((s) => (
-                    <tr key={s.id} className="hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors animate-fade-in-up">
-                      <td className="py-3 font-extrabold text-slate-900 dark:text-white">{s.receiptNumber}</td>
-                      <td className="py-3 font-medium">{s.customerName}</td>
-                      <td className="py-3 text-slate-400">{formatDate(s.formattedDate)}</td>
-                      <td className="py-3 font-bold text-indigo-500">{s.paymentMethod}</td>
-                      <td className="py-3">${s.tax?.toFixed(2)}</td>
-                      <td className="py-3 text-right font-black text-slate-900 dark:text-white">${s.total.toFixed(2)}</td>
+                    <tr key={s.id} className="animate-fade-in-up">
+                      <td className="ds-cell-strong">{s.receiptNumber}</td>
+                      <td>{s.customerName}</td>
+                      <td className="whitespace-nowrap">{formatDate(s.formattedDate)}</td>
+                      <td className="whitespace-nowrap">{s.paymentMethod}</td>
+                      <td className="ds-cell-numeric">${s.tax?.toFixed(2)}</td>
+                      <td className="ds-cell-numeric">${s.total.toFixed(2)}</td>
                     </tr>
                   ))
                 )}
@@ -250,28 +250,28 @@ export default function ReportsScreen() {
         {/* Report 3: Inventory Valuation */}
         {selectedReport === 'Inventory' && (
           <div className="responsive-table-wrapper">
-            <table className="w-full text-left text-xs font-semibold">
+            <table className="ds-table">
               <thead>
-                <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">
-                  <th className="pb-3">{t('products.product_name', 'Product Name')}</th>
-                  <th className="pb-3">{t('products.sku', 'SKU')}</th>
-                  <th className="pb-3">{t('products.stock_quantity', 'In Stock Units')}</th>
-                  <th className="pb-3">{t('products.cost', 'Cost Price')}</th>
-                  <th className="pb-3">{t('products.price', 'Selling Price')}</th>
-                  <th className="pb-3 text-right">{t('reports.inventory_valuation', 'Total Cost Value')}</th>
+                <tr>
+                  <th>{t('products.product_name', 'Product Name')}</th>
+                  <th>{t('products.sku', 'SKU')}</th>
+                  <th>{t('products.stock_quantity', 'In Stock Units')}</th>
+                  <th>{t('products.cost', 'Cost Price')}</th>
+                  <th>{t('products.price', 'Selling Price')}</th>
+                  <th className="text-right">{t('reports.inventory_valuation', 'Total Cost Value')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200/40 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+              <tbody>
                 {products.filter(p => !p.isArchived).length === 0 ? (
-                  <tr><td colSpan="6" className="py-8 text-center text-xs font-semibold text-slate-400">No products in inventory. Add products to see valuation data.</td></tr>
+                  <tr><td colSpan="6" className="py-10 text-center">No products in inventory. Add products to see valuation data.</td></tr>
                 ) : (
                   products.filter(p => !p.isArchived).map((p) => (
                     <tr key={p.id} className="hover:bg-white/40 dark:hover:bg-slate-800/40 animate-fade-in-up">
-                      <td className="py-3 font-extrabold text-slate-900 dark:text-white">{p.name}</td>
+                      <td className="ds-cell-strong">{p.name}</td>
                       <td className="py-3 font-mono text-slate-400">{p.sku}</td>
                       <td className="py-3 font-bold">{p.quantity} {p.unit}</td>
-                      <td className="py-3">${p.costPrice.toFixed(2)}</td>
-                      <td className="py-3">${p.sellingPrice.toFixed(2)}</td>
+                      <td className="ds-cell-numeric">${p.costPrice.toFixed(2)}</td>
+                      <td className="ds-cell-numeric">${p.sellingPrice.toFixed(2)}</td>
                       <td className="py-3 text-right font-black text-emerald-600 dark:text-emerald-400">
                         ${(p.costPrice * p.quantity).toFixed(2)}
                       </td>
@@ -286,25 +286,25 @@ export default function ReportsScreen() {
         {/* Report 4: Product Performance */}
         {selectedReport === 'Product' && (
           <div className="responsive-table-wrapper">
-            <table className="w-full text-left text-xs font-semibold">
+            <table className="ds-table">
               <thead>
-                <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">
-                  <th className="pb-3">{t('products.product_name', 'Product Name')}</th>
-                  <th className="pb-3">{t('products.category', 'Category')}</th>
-                  <th className="pb-3">{t('products.profit', 'Profit Margin %')}</th>
-                  <th className="pb-3 text-right">{t('products.price', 'Selling Price')}</th>
+                <tr>
+                  <th>{t('products.product_name', 'Product Name')}</th>
+                  <th>{t('products.category', 'Category')}</th>
+                  <th>{t('products.profit', 'Profit Margin %')}</th>
+                  <th className="text-right">{t('products.price', 'Selling Price')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/40 dark:divide-slate-800/60">
                 {products.filter(p => !p.isArchived).length === 0 ? (
-                  <tr><td colSpan="4" className="py-8 text-center text-xs font-semibold text-slate-400">No products to analyze. Add products to see performance metrics.</td></tr>
+                  <tr><td colSpan="4" className="py-10 text-center">No products to analyze. Add products to see performance metrics.</td></tr>
                 ) : (
                   products.filter(p => !p.isArchived).map((p) => (
                     <tr key={p.id} className="animate-fade-in-up">
                       <td className="py-3 font-bold text-slate-900 dark:text-white">{p.name}</td>
-                      <td className="py-3 text-slate-400">{p.category}</td>
+                      <td className="whitespace-nowrap">{p.category}</td>
                       <td className="py-3 font-black text-emerald-600">+{p.profitMargin}%</td>
-                      <td className="py-3 text-right font-black text-slate-900 dark:text-white">${p.sellingPrice.toFixed(2)}</td>
+                      <td className="ds-cell-numeric">${p.sellingPrice.toFixed(2)}</td>
                     </tr>
                   ))
                 )}
@@ -316,23 +316,23 @@ export default function ReportsScreen() {
         {/* Report 5: Tax & VAT Audit */}
         {selectedReport === 'Tax' && (
           <div className="responsive-table-wrapper">
-            <table className="w-full text-left text-xs font-semibold">
+            <table className="ds-table">
               <thead>
-                <tr className="border-b border-slate-200/60 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase">
-                  <th className="pb-3">Transaction</th>
-                  <th className="pb-3">{t('common.subtotal', 'Subtotal')}</th>
-                  <th className="pb-3">Applied Tax Rate</th>
-                  <th className="pb-3 text-right">{t('common.tax', 'Tax Amount')}</th>
+                <tr>
+                  <th>Transaction</th>
+                  <th>{t('common.subtotal', 'Subtotal')}</th>
+                  <th>Applied Tax Rate</th>
+                  <th className="text-right">{t('common.tax', 'Tax Amount')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/40 dark:divide-slate-800/60">
                 {sales.length === 0 ? (
-                  <tr><td colSpan="4" className="py-8 text-center text-xs font-semibold text-slate-400">No tax data available. Complete a sale to generate tax records.</td></tr>
+                  <tr><td colSpan="4" className="py-10 text-center">No tax data available. Complete a sale to generate tax records.</td></tr>
                 ) : (
                   sales.map((s) => (
                     <tr key={s.id} className="animate-fade-in-up">
                       <td className="py-3 font-bold text-slate-900 dark:text-white">{s.receiptNumber}</td>
-                      <td className="py-3">${s.subtotal?.toFixed(2)}</td>
+                      <td className="ds-cell-numeric">${s.subtotal?.toFixed(2)}</td>
                       <td className="py-3 font-mono text-slate-400">{activeCompany?.taxRate}%</td>
                       <td className="py-3 text-right font-black text-indigo-500">${s.tax?.toFixed(2)}</td>
                     </tr>

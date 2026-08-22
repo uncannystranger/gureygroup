@@ -24,7 +24,10 @@ export async function runMigrations() {
   const collection = Sale.collection;
   for (const indexName of ['companyId_1_invoiceNumber_1', 'companyId_1_receiptNumber_1', 'companyId_1_createdAt_-1']) {
     try { await collection.dropIndex(indexName); } catch (error) {
-      if (error.codeName !== 'IndexNotFound') throw error;
+      // A fresh database has neither the collection nor the legacy indexes;
+      // both cases are expected and must not abort the migration.
+      const tolerated = ['IndexNotFound', 'NamespaceNotFound'];
+      if (!tolerated.includes(error.codeName)) throw error;
     }
   }
   await Sale.syncIndexes();

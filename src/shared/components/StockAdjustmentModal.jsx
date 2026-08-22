@@ -4,7 +4,7 @@ import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
 
 export default function StockAdjustmentModal({ isOpen, onClose, product }) {
-  const { logStockAdjustment, updateProduct } = useMultiTenant();
+  const { adjustStock } = useMultiTenant();
   const { t } = useLanguage();
 
   const [adjustmentType, setAdjustmentType] = useState('add');
@@ -22,14 +22,27 @@ export default function StockAdjustmentModal({ isOpen, onClose, product }) {
     'Customer Return Restock'
   ];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const delta = adjustmentType === 'add' ? Number(quantity) : -Number(quantity);
-    const newQty = Math.max(0, product.quantity + delta);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-    updateProduct(product.id, { quantity: newQty });
-    logStockAdjustment(product.id, product.name, product.sku, delta, reason);
-    onClose();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      // The API applies the stock change and writes the ledger entry together,
+      // and rejects anything that would take stock below zero.
+      await adjustStock({
+        productId: product.id,
+        delta: adjustmentType === 'add' ? Number(quantity) : -Number(quantity),
+        reason,
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'That adjustment could not be saved.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -116,8 +129,13 @@ export default function StockAdjustmentModal({ isOpen, onClose, product }) {
             >
               {t('common.cancel', 'Cancel')}
             </button>
+            {error && (
+          <p className="text-xs font-semibold" style={{ color: 'var(--ds-critical)' }} role="alert">{error}</p>
+        )}
+
             <button
-              type="submit"
+          type="submit"
+          disabled={saving}
               className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-black shadow-md hover:scale-105 transition-all btn-micro"
             >
               {t('common.save', 'Save Adjustment')}

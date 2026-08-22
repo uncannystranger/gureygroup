@@ -7,7 +7,13 @@ const PORT = BACKEND_PORT;
 
 // Initialize MongoDB & Start Express Server
 connectMongoDB().then(async () => {
-  await runMigrations();
+  // Migrations are additive and idempotent. A migration failure must never
+  // stop the API from serving — it is reported, not fatal.
+  try {
+    await runMigrations();
+  } catch (migrationError) {
+    console.error('[Gurey Group Backend Server] Migration failed (continuing to boot):', migrationError.message);
+  }
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Gurey Group Backend Server] Running on port ${PORT}`);
     console.log(`[Gurey Group Backend Server] Listening: http://127.0.0.1:${PORT}`);
@@ -17,6 +23,6 @@ connectMongoDB().then(async () => {
     console.log(`[Gurey Group Backend Server] Registered API routes: ${REGISTERED_API_ROUTES.join(', ')}`);
   });
 }).catch((err) => {
-  console.error('[Gurey Group Backend Server] Failed to connect to MongoDB:', err.message);
+  console.error('[Gurey Group Backend Server] Failed to start:', err.message);
   process.exit(1);
 });

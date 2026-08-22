@@ -82,7 +82,7 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
         {/* Mobile Hamburger Button */}
         <button
           onClick={onToggleMobileNav}
-          className="lg:hidden p-2 rounded-2xl glass-panel text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-white/15 transition-all shadow-sm btn-micro"
+          className="lg:hidden ds-icon-btn w-10 h-10 shrink-0"
           aria-label="Open mobile menu"
         >
           <Menu className="w-5 h-5" />
@@ -92,7 +92,7 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
           {isDashboard ? (
             <div>
               <h1 className="min-w-0 text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                <span className="truncate">{getLocalizedGreeting()}, {profile.firstName || 'Abdullahi'}</span>
+                <span className="truncate">{getLocalizedGreeting()}, {profile.firstName || profile.displayName?.split(' ')[0] || t('common.there', 'there')}</span>
               </h1>
               <p className="max-w-[38rem] text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
                 {t('header.welcome_sub', "Welcome back. Here's what's happening in your business today.")}
@@ -116,7 +116,9 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
         {/* Search Bar */}
         <button
           onClick={onOpenSearch}
-          className="flex items-center space-x-3 px-4 py-2 rounded-2xl glass-panel text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all text-xs font-medium border border-white/60 dark:border-white/10 shadow-sm btn-micro"
+          aria-label={t('common.search_placeholder', 'Search catalog, orders...')}
+          aria-keyshortcuts="Meta+K Control+K"
+          className="flex items-center gap-2.5 px-3.5 h-10 rounded-xl glass glass-faint text-[var(--ds-text-muted)] hover:text-[var(--ds-text)] transition-colors text-xs font-medium"
         >
           <Search className="w-4 h-4 text-slate-400" />
           <span className="hidden sm:inline">{t('common.search_placeholder', 'Search catalog, orders...')}</span>
@@ -130,9 +132,10 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
             <button
               type="button"
               onClick={() => setIsBranchOpen((open) => !open)}
-              className="flex items-center gap-2 px-3 py-2 rounded-2xl glass-panel border border-white/60 dark:border-white/10 shadow-sm text-left hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all btn-micro"
+              className="flex items-center gap-2 px-3 h-10 rounded-xl glass glass-faint text-left hover:border-[var(--ds-accent)] transition-colors"
               aria-haspopup="listbox"
               aria-expanded={isBranchOpen}
+              aria-label={`${t('common.branch', 'Branch')}: ${activeBranch?.name || t('common.select_branch', 'Select branch')}`}
             >
               <span className="w-7 h-7 rounded-xl bg-indigo-500/15 flex items-center justify-center"><Building2 className="w-3.5 h-3.5 text-indigo-500" /></span>
               <span className="hidden lg:block max-w-[126px]">
@@ -142,7 +145,7 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
               <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isBranchOpen ? 'rotate-180' : ''}`} />
             </button>
             {isBranchOpen && (
-              <div className="absolute right-0 top-12 z-50 w-[330px] max-w-[calc(100vw-1.5rem)] p-2 rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-white/80 dark:border-white/10 shadow-2xl animate-dropdown">
+              <div className="absolute right-0 top-12 z-50 w-[330px] max-w-[calc(100vw-1.5rem)] p-2 rounded-2xl glass glass-strong animate-dropdown">
                 <div className="px-3 py-2 mb-1"><p className="text-xs font-black text-slate-900 dark:text-white">Your locations</p><p className="text-[10px] font-medium text-slate-400">Switching updates your whole workspace</p></div>
                 <div className="max-h-80 overflow-y-auto space-y-1">
                   {branches.map((branch) => {

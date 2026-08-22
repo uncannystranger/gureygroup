@@ -10,7 +10,10 @@ import {
   EyeOff, 
   ArrowRight, 
   CheckCircle2, 
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  Store,
+  ScrollText
 } from 'lucide-react';
 
 export default function AuthScreen() {
@@ -128,27 +131,78 @@ export default function AuthScreen() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col justify-between bg-[#EBF0F7] dark:bg-[#0F172A] text-slate-800 dark:text-slate-100 relative overflow-hidden transition-colors duration-300 selection:bg-indigo-500 selection:text-white">
-      
-      {/* Dynamic Animated Ambient Glow Orbs */}
-      <div className="absolute top-[-10%] left-[20%] w-[450px] h-[450px] bg-indigo-500/15 dark:bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[15%] w-[500px] h-[500px] bg-purple-500/15 dark:bg-purple-600/20 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute top-[40%] left-[-10%] w-[350px] h-[350px] bg-blue-500/15 dark:bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
+    <div className="ds-app-shell min-h-screen w-full relative overflow-hidden text-[var(--ds-text)] selection:bg-indigo-500 selection:text-white">
 
-      {/* Subtle Pattern Background Overlay */}
-      <div 
-        className="absolute inset-0 opacity-[0.03] dark:opacity-[0.04] pointer-events-none"
+      {/* One soft light source rather than three competing colour washes */}
+      <div className="absolute -top-[15%] left-[10%] w-[520px] h-[520px] rounded-full blur-[150px] pointer-events-none bg-[var(--ds-accent)] opacity-[0.10] dark:opacity-[0.18]" />
+      <div
+        className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
         style={{
           backgroundImage: `radial-gradient(circle, currentColor 1px, transparent 1px)`,
-          backgroundSize: '24px 24px'
+          backgroundSize: '26px 26px'
         }}
       />
 
+      <div className="relative z-10 min-h-screen grid lg:grid-cols-[1.05fr_minmax(0,26rem)] xl:grid-cols-[1.15fr_minmax(0,28rem)]">
+
+        {/* Brand column — fills the space a lone centred card used to leave empty */}
+        <section className="hidden lg:flex flex-col justify-between p-12 xl:p-16">
+          <div className="flex items-center gap-3 ds-rise" style={{ '--ds-index': 0 }}>
+            <span className="w-10 h-10 rounded-2xl capsule-mesh-gradient grid place-items-center shrink-0">
+              <Sparkles className="w-5 h-5 text-white" aria-hidden="true" />
+            </span>
+            <span className="text-base font-black tracking-tight text-[var(--ds-text)]">
+              GUREY<span className="text-[var(--ds-accent)]">GROUP</span>
+            </span>
+          </div>
+
+          <div className="max-w-lg">
+            <p className="ds-eyebrow ds-rise" style={{ '--ds-index': 1 }}>Retail operations platform</p>
+            <h1
+              className="mt-4 text-[clamp(2rem,1.2rem+2.4vw,3.25rem)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[var(--ds-text)] ds-rise [text-wrap:balance] max-w-[14ch]"
+              style={{ '--ds-index': 2 }}
+            >
+              Every branch, every sale, one source of truth.
+            </h1>
+            <p className="ds-body mt-5 max-w-md ds-rise" style={{ '--ds-index': 3 }}>
+              Point of sale, inventory, team permissions and audit history for
+              multi-branch retail — with each workspace isolated from every other.
+            </p>
+
+            <ul className="mt-10 space-y-4 list-none p-0">
+              {[
+                { icon: ShieldCheck, title: 'Isolated workspaces', copy: 'Every request is scoped to your organisation and branch.' },
+                { icon: Store, title: 'Branch-aware inventory', copy: 'Stock, pricing and sales stay bound to the branch that owns them.' },
+                { icon: ScrollText, title: 'Audited by default', copy: 'Sales, sessions and permission changes are all recorded.' },
+              ].map((feature, index) => {
+                const Icon = feature.icon;
+                return (
+                  <li key={feature.title} className="flex items-start gap-3.5 ds-rise" style={{ '--ds-index': index + 4 }}>
+                    <span
+                      className="grid place-items-center w-9 h-9 rounded-xl shrink-0"
+                      style={{ background: 'var(--ds-accent-soft)', color: 'var(--ds-accent)' }}
+                      aria-hidden="true"
+                    >
+                      <Icon className="w-4 h-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block ds-heading">{feature.title}</span>
+                      <span className="block ds-caption mt-0.5">{feature.copy}</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <p className="ds-caption">© {new Date().getFullYear()} Gurey Group</p>
+        </section>
+
       {/* Main Authentication Container - Scaled to fit single screen without scrolling */}
-      <main className="w-full max-w-md mx-auto px-4 my-auto py-6 z-10 animate-fade-scale">
+      <main className="w-full flex flex-col justify-center px-4 sm:px-8 lg:px-10 py-8 lg:py-12 max-w-md mx-auto lg:max-w-none lg:mx-0 animate-fade-scale">
         
-        {/* CENTERED LOGO BRAND CONTAINER ABOVE CARD */}
-        <div className="flex flex-col items-center justify-center text-center mb-5">
+        {/* Compact brand lock-up — only needed where the brand column is hidden */}
+        <div className="flex flex-col items-center justify-center text-center mb-5 lg:hidden">
           <div className="relative mb-2 group cursor-pointer">
             {/* Pulsing Outer Halo */}
             <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-60 dark:opacity-70 blur-md group-hover:opacity-100 transition duration-500 group-hover:duration-200 animate-pulse" />
@@ -430,12 +484,13 @@ export default function AuthScreen() {
 
         </div>
 
+        <footer className="w-full text-center pb-6 pt-3 ds-caption text-[10px]">
+          <span>Made with </span><span className="text-orange-500" role="img" aria-label="love">🧡</span><span> by uncannystranger</span>
+        </footer>
+
       </main>
 
-      {/* Clean Compact Footer */}
-      <footer className="w-full text-center py-3 text-[10px] text-slate-500 dark:text-slate-500 font-medium z-10">
-        <span>Made with </span><span className="text-orange-500" aria-label="love">🧡</span><span> by uncannystranger</span>
-      </footer>
+      </div>
 
     </div>
   );

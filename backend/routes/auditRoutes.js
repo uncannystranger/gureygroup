@@ -1,9 +1,14 @@
 import express from 'express';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission, requireVerifiedEmail } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// User input must be escaped before it is used as a regular expression,
+// otherwise a crafted filter can be turned into a catastrophic-backtracking DoS.
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 router.use(enforceTenantIsolation);
+router.use(requireVerifiedEmail);
 
 /**
  * GET /api/audit
@@ -16,7 +21,7 @@ router.get('/', requirePermission('audit:view'), async (req, res) => {
 
     const filter = { companyId };
     if (action) filter.action = action;
-    if (userEmail) filter.userEmail = { $regex: userEmail, $options: 'i' };
+    if (userEmail) filter.userEmail = { $regex: escapeRegex(userEmail), $options: 'i' };
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = new Date(from);

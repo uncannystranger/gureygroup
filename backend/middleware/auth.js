@@ -1,17 +1,28 @@
 import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
+import '../config/env.js';
 import Membership from '../models/Membership.js';
 import Branch from '../models/Branch.js';
+import User from '../models/User.js';
+import EmployeeMember from '../models/EmployeeMember.js';
 
-dotenv.config({ path: '../.env' });
-dotenv.config();
+/**
+ * Signing secrets must come from the environment. A committed fallback secret
+ * would let anyone holding the source forge Owner tokens, so a missing secret
+ * is a startup failure rather than a warning.
+ */
+const requireSecret = (name) => {
+  const value = process.env[name];
+  if (!value || value.length < 32) {
+    throw new Error(
+      `[Auth] ${name} is missing or too short. Set a random 64-byte hex value: ` +
+      'node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
+    );
+  }
+  return value;
+};
 
-const JWT_SECRET = process.env.JWT_SECRET || 'gurey_group_default_jwt_secret_fallback_key_2026';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'gurey_group_default_jwt_refresh_secret_fallback_key_2026';
-
-if (!process.env.JWT_SECRET) {
-  console.warn('[Auth Middleware] WARNING: JWT_SECRET environment variable is not set. Using fallback secret.');
-}
+const JWT_SECRET = requireSecret('JWT_SECRET');
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
 
 /**
  * Middleware: Verify Auth Token & Enforce Tenant Isolation Scope
@@ -43,7 +54,7 @@ export const enforceTenantIsolation = async (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     const requestedTenant = req.headers['x-company-id'];
     const tokenTenant = decoded.companyId;
     const tenantId = requestedTenant || tokenTenant;
@@ -104,6 +115,46 @@ export const enforceTenantIsolation = async (req, res, next) => {
       error: 'Authentication verification service error',
       message: process.env.NODE_ENV === 'production' ? 'Authentication failed due to internal service error.' : err.message,
     });
+  }
+};
+
+/**
+ * Middleware: require a confirmed email address.
+ *
+ * Authentication proves who the caller is; it does not prove they control the
+ * address. The state is read from the database on every request rather than
+ * from the JWT, so revoking verification takes effect immediately and a token
+ * minted before verification cannot be replayed for access afterwards.
+ */
+export const requireVerifiedEmail = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized: No authenticated user.' });
+    }
+
+    const account = req.user.accountType === 'employee'
+      ? await EmployeeMember.findOne({ employeeId: req.user.uid }).select('emailVerified email')
+      : await User.findOne({ firebaseUid: req.user.uid }).select('emailVerified email');
+
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    if (!account.emailVerified) {
+      return res.status(403).json({
+        error: 'Confirm your email address to continue.',
+        // The client keys off this code to route to the verification screen
+        // rather than showing a generic permission error.
+        code: 'EMAIL_NOT_VERIFIED',
+        email: account.email,
+      });
+    }
+
+    req.emailVerified = true;
+    next();
+  } catch (error) {
+    console.error('[Verification Guard Error]', error);
+    return res.status(500).json({ error: 'Unable to verify account status.' });
   }
 };
 

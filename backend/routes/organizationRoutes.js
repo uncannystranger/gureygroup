@@ -4,11 +4,12 @@ import Membership from '../models/Membership.js';
 import Branch from '../models/Branch.js';
 import User from '../models/User.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission, requireVerifiedEmail } from '../middleware/auth.js';
 import { getPermissionsForRole } from '../rbac/permissions.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
+router.use(requireVerifiedEmail);
 
 /**
  * POST /api/organizations

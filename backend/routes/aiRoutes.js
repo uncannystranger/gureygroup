@@ -1,11 +1,12 @@
 import express from 'express';
 import AiConversation from '../models/AiConversation.js';
-import { enforceTenantIsolation } from '../middleware/auth.js';
+import { enforceTenantIsolation, requireVerifiedEmail } from '../middleware/auth.js';
 import { generateResponse, getAiProviderStatus } from '../services/aiService.js';
 import { buildAiWorkspaceContext } from '../services/aiWorkspaceContext.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
+router.use(requireVerifiedEmail);
 
 router.get('/status', (req, res) => res.json({ status: getAiProviderStatus().available ? 'connected' : 'unavailable', ...(req.user.role === 'Owner' || req.user.role === 'Admin' ? { diagnostic: getAiProviderStatus() } : {}) }));
 

@@ -42,6 +42,15 @@ const userSchema = new mongoose.Schema({
   emailNotifications: { type: Boolean, default: true },
   browserNotifications: { type: Boolean, default: true },
 
+  // Email verification — the authoritative record. The frontend previously
+  // tracked this in local state only, which meant a refresh (or a crafted
+  // client) granted full access to an unverified account.
+  emailVerified: { type: Boolean, default: false, index: true },
+  emailVerifiedAt: { type: Date, default: null },
+  // How the address was proven: 'provider' (the identity provider asserted it,
+  // e.g. Google) or 'link' (the user opened one of our verification links).
+  emailVerificationMethod: { type: String, enum: ['provider', 'link', null], default: null },
+
   // Activity
   lastLogin: { type: Date, default: Date.now }
 }, {

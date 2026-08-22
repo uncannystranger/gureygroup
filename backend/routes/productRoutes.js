@@ -1,12 +1,41 @@
 import express from 'express';
 import Product from '../models/Product.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requirePermission, requireBranchAccess } from '../middleware/auth.js';
+import StockAdjustment from '../models/StockAdjustment.js';
+import { enforceTenantIsolation, requirePermission, requireBranchAccess, requireVerifiedEmail } from '../middleware/auth.js';
 
 const router = express.Router();
 
+/**
+ * Product images are references, never payloads.
+ *
+ * Inlining a data: URI here is what made product creation fail with "request
+ * entity too large": base64 inflates a file ~33%, so one phone photo could
+ * exceed the JSON body limit on its own. Images go to POST /api/uploads and
+ * the product stores the returned URL.
+ */
+const MAX_IMAGE_REFS = 6;
+const MAX_REF_LENGTH = 2048;
+
+const validateImageRefs = (value) => {
+  if (value === undefined) return null;
+  const list = Array.isArray(value) ? value : [value];
+  if (list.length > MAX_IMAGE_REFS) {
+    return `A product can have at most ${MAX_IMAGE_REFS} images.`;
+  }
+  for (const ref of list) {
+    if (typeof ref !== 'string') return 'Image references must be URLs.';
+    if (ref.startsWith('data:')) {
+      return 'Upload images to /api/uploads first, then reference the returned URL.';
+    }
+    if (ref.length > MAX_REF_LENGTH) return 'That image URL is too long.';
+  }
+  return null;
+};
+
 // Apply Multi-Tenant Isolation Middleware to all product routes
 router.use(enforceTenantIsolation);
+router.use(requireVerifiedEmail);
 
 /**
  * GET /api/products
@@ -15,7 +44,11 @@ router.use(enforceTenantIsolation);
 router.get('/', requirePermission('products:view'), async (req, res) => {
   try {
     const branchId = await requireBranchAccess(req, req.query.branchId || req.headers['x-branch-id']);
-    const products = await Product.find({ companyId: req.tenantId, branchId }).sort({ createdAt: -1 });
+    // Archived products are soft-deleted; they must not reappear in the catalogue.
+    const includeArchived = req.query.includeArchived === 'true';
+    const filter = { companyId: req.tenantId, branchId };
+    if (!includeArchived) filter.isArchived = { $ne: true };
+    const products = await Product.find(filter).sort({ createdAt: -1 });
     res.json(products);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || 'Failed to fetch tenant products' });
@@ -29,6 +62,11 @@ router.get('/', requirePermission('products:view'), async (req, res) => {
 router.post('/', requirePermission('products:create'), async (req, res) => {
   try {
     const { name, sku, barcode, brand, category, supplier, description, costPrice, sellingPrice, stock, quantity, minStockThreshold, lowStockLevel, images, primaryImage } = req.body;
+
+    const imageError = validateImageRefs(images) || validateImageRefs(primaryImage);
+    if (imageError) {
+      return res.status(400).json({ error: imageError, code: 'INLINE_IMAGE_REJECTED' });
+    }
     const branchId = await requireBranchAccess(req, req.body.branchId || req.headers['x-branch-id']);
     const stockValue = Number(stock ?? quantity) || 0;
     const minStock = Number(minStockThreshold ?? lowStockLevel) || 5;
@@ -99,6 +137,11 @@ router.patch('/:id', requirePermission('products:edit'), async (req, res) => {
     }
     delete updates.lowStockLevel;
 
+    const imageError = validateImageRefs(updates.images) || validateImageRefs(updates.primaryImage);
+    if (imageError) {
+      return res.status(400).json({ error: imageError, code: 'INLINE_IMAGE_REJECTED' });
+    }
+
     if (updates.costPrice !== undefined) updates.costPrice = Number(updates.costPrice) || 0;
     if (updates.sellingPrice !== undefined) updates.sellingPrice = Number(updates.sellingPrice) || 0;
     if (updates.stock !== undefined) updates.stock = Number(updates.stock) || 0;
@@ -121,6 +164,24 @@ router.patch('/:id', requirePermission('products:edit'), async (req, res) => {
       { $set: updates },
       { new: true, runValidators: true }
     );
+
+    // A stock edit is a stock movement — record it like any other.
+    if (updates.stock !== undefined && updates.stock !== existing.stock) {
+      const delta = updates.stock - existing.stock;
+      await StockAdjustment.create({
+        companyId: req.tenantId,
+        branchId,
+        productId: String(product._id),
+        productName: product.name,
+        sku: product.sku,
+        delta,
+        stockAfter: product.stock,
+        reason: req.body.adjustmentReason || 'Manual stock edit',
+        source: 'correction',
+        userId: req.user.uid,
+        userName: req.user.email,
+      });
+    }
 
     await Audit.create({
       companyId: req.tenantId,

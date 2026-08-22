@@ -13,12 +13,16 @@ import {
   CheckCircle2, 
   Flame, 
   Truck, 
-  Target 
+  Target,
+  PackageX
 } from 'lucide-react';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
 import TotalInventoryCapsule from '../../shared/components/TotalInventoryCapsule';
 import AnimatedCounter from '../../shared/components/AnimatedCounter';
+import StatCard from '../../shared/ui/StatCard';
+import ProductThumb from '../../shared/ui/ProductThumb';
+import { EmptyState } from '../../shared/ui/States';
 
 export default function DashboardScreen({ onViewAllSales }) {
   const { sales, products, purchaseOrders, totalSalesRevenue, addSale, activeCompany, addNotification } = useMultiTenant();
@@ -27,20 +31,16 @@ export default function DashboardScreen({ onViewAllSales }) {
   const [posSearchTerm, setPosSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [discountPercent, setDiscountPercent] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('Card');
+  const [paymentMethod, setPaymentMethod] = useState('Credit Card');
   const [isSaleCompleted, setIsSaleCompleted] = useState(false);
 
   const recentSales = sales.slice(0, 5);
   const lowStockProducts = products.filter(p => !p.isArchived && p.quantity <= p.lowStockLevel);
 
-  // Expiring Products (< 30 days or already passed)
-  const expiringProducts = products.filter(p => {
-    if (!p.expiryDate || p.isArchived) return false;
-    const expDate = new Date(p.expiryDate);
-    const today = new Date();
-    const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
-    return diffDays <= 30;
-  });
+  // Out-of-stock is a metric the catalogue can actually report on, unlike the
+  // former "expiring soon" tile — products carry no expiry date, so it was
+  // permanently pinned at zero.
+  const outOfStockProducts = products.filter(p => !p.isArchived && p.quantity <= 0);
 
   // Slow Moving Products (High stock quantity, e.g., > 40 units, but not in recent sales)
   const slowMovingProducts = products.filter(p => !p.isArchived && p.quantity >= 40 && p.sellingPrice >= 30).slice(0, 3);
@@ -65,7 +65,13 @@ export default function DashboardScreen({ onViewAllSales }) {
   );
 
   const addToCart = (product) => {
-    if (product.quantity <= 0) return alert(t('status.out_of_stock', 'Product is out of stock!'));
+    if (product.quantity <= 0) {
+      return addNotification(
+        t('status.out_of_stock', 'Out of stock'),
+        `${product.name} ${t('pos.out_of_stock_message', 'cannot be added — there is no stock left in this branch.')}`,
+        'warning'
+      );
+    }
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -87,14 +93,16 @@ export default function DashboardScreen({ onViewAllSales }) {
 
   const subtotal = cart.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
   const discountAmount = (subtotal * discountPercent) / 100;
-  const taxRate = activeCompany?.taxRate || 8.5;
+  const taxRate = Number(activeCompany?.taxRate ?? 0);
   const taxAmount = ((subtotal - discountAmount) * taxRate) / 100;
   const grandTotal = subtotal - discountAmount + taxAmount;
 
   const averageOrderValue = sales.length > 0 ? (totalSalesRevenue / sales.length).toFixed(2) : '0.00';
 
   const handleCreateSale = () => {
-    if (cart.length === 0) return alert(t('pos.cart_empty_title', 'Add products to shopping cart first!'));
+    if (cart.length === 0) {
+      return addNotification(t('pos.cart_empty_title', 'Cart is empty'), t('pos.cart_empty_desc', 'Add at least one product before completing the sale.'), 'warning');
+    }
     
     addSale({
       customerName: t('pos.walk_in', 'Walk-in Customer'),
@@ -124,61 +132,40 @@ export default function DashboardScreen({ onViewAllSales }) {
         {/* Total Inventory Value Capsule */}
         <TotalInventoryCapsule />
 
-        {/* Executive Commercial KPI Widget Row */}
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="glass-panel rounded-3xl p-4 relative overflow-hidden card-hover-lift">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-              <span>{t('dashboard.total_revenue', 'Today Revenue')}</span>
-              <DollarSign className="w-4 h-4 text-emerald-500" />
-            </div>
-            <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-                <AnimatedCounter value={totalSalesRevenue} prefix="$" decimals={2} />
-              </span>
-              <p className="text-[10px] font-bold text-emerald-500 mt-0.5 flex items-center gap-0.5">
-                <TrendingUp className="w-3 h-3" /> AOV: ${averageOrderValue}
-              </p>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-3xl p-4 relative overflow-hidden card-hover-lift">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-              <span>{t('dashboard.total_sales', 'Fulfilled Orders')}</span>
-              <ShoppingBag className="w-4 h-4 text-blue-500" />
-            </div>
-            <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-                <AnimatedCounter value={sales.length} />
-              </span>
-              <p className="text-[10px] font-bold text-emerald-500 mt-0.5">{t('status.completed', '100% Fulfilled')}</p>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-3xl p-4 relative overflow-hidden card-hover-lift">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-              <span>{t('dashboard.low_stock_alerts', 'Low Stock Alert')}</span>
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-            </div>
-            <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">
-                <AnimatedCounter value={lowStockProducts.length} />
-              </span>
-              <p className="text-[10px] font-bold text-amber-500 mt-0.5">{t('status.low_stock', 'Kayd Hoose')}</p>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-3xl p-4 relative overflow-hidden card-hover-lift">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-              <span>{t('products.exp_date', 'Expiring Soon')}</span>
-              <Clock className="w-4 h-4 text-rose-500" />
-            </div>
-            <div className="mt-2">
-              <span className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">
-                <AnimatedCounter value={expiringProducts.length} />
-              </span>
-              <p className="text-[10px] font-bold text-rose-500 mt-0.5">&lt; 30 Days Expiry</p>
-            </div>
-          </div>
+        {/* Headline metrics — one shape, one rhythm, scannable in a glance */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <StatCard
+            index={0}
+            label={t('dashboard.total_revenue', 'Revenue')}
+            value={<AnimatedCounter value={totalSalesRevenue} prefix="$" decimals={2} />}
+            support={`${t('dashboard.aov', 'Avg. order')} $${averageOrderValue}`}
+            icon={DollarSign}
+            tone="positive"
+          />
+          <StatCard
+            index={1}
+            label={t('dashboard.total_sales', 'Orders')}
+            value={<AnimatedCounter value={sales.length} />}
+            support={t('dashboard.orders_support', 'Completed checkouts')}
+            icon={ShoppingBag}
+            tone="accent"
+          />
+          <StatCard
+            index={2}
+            label={t('dashboard.low_stock_alerts', 'Low stock')}
+            value={<AnimatedCounter value={lowStockProducts.length} />}
+            support={t('dashboard.low_stock_support', 'At or below threshold')}
+            icon={AlertTriangle}
+            tone={lowStockProducts.length > 0 ? 'warning' : 'neutral'}
+          />
+          <StatCard
+            index={3}
+            label={t('dashboard.out_of_stock', 'Out of stock')}
+            value={<AnimatedCounter value={outOfStockProducts.length} />}
+            support={t('dashboard.out_of_stock_support', 'Needs restocking')}
+            icon={PackageX}
+            tone={outOfStockProducts.length > 0 ? 'critical' : 'neutral'}
+          />
         </div>
 
         {/* Commercial Sales Goal Progress Widget */}
@@ -239,7 +226,7 @@ export default function DashboardScreen({ onViewAllSales }) {
                 bestSellers.map((item) => (
                   <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700 text-xs animate-fade-in-up">
                     <div className="flex items-center space-x-3">
-                      <img src={item.images[0]} alt={item.name} className="w-9 h-9 rounded-xl object-cover" />
+                      <ProductThumb src={item.images?.[0]} name={item.name} className="w-9 h-9" />
                       <div>
                         <h4 className="font-bold text-slate-900 dark:text-white line-clamp-1">{item.name}</h4>
                         <p className="text-[10px] text-slate-400">SKU: {item.sku} • Stock: {item.quantity}</p>
@@ -373,7 +360,11 @@ export default function DashboardScreen({ onViewAllSales }) {
                   />
                 </div>
                 <button
-                  onClick={() => alert('Barcode Scanner Active - Scan cosmetic product tag.')}
+                  onClick={() => addNotification(
+                    t('pos.scanner_title', 'Scanner ready'),
+                    t('pos.scanner_desc', 'Scan a barcode, or type a SKU into the search field and press Enter.'),
+                    'info'
+                  )}
                   className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors btn-micro"
                   title="Barcode Scan Placeholder"
                 >
@@ -442,7 +433,7 @@ export default function DashboardScreen({ onViewAllSales }) {
                 {/* Payment Method Selection */}
                 <div className="grid grid-cols-3 gap-1.5 pt-1">
                   {[
-                    { id: 'Card', labelKey: 'pos.card', icon: CreditCard },
+                    { id: 'Credit Card', labelKey: 'pos.card', icon: CreditCard },
                     { id: 'Cash', labelKey: 'pos.cash', icon: DollarSign },
                     { id: 'Mobile Money', labelKey: 'pos.mobile_money', icon: Smartphone }
                   ].map((pm) => {

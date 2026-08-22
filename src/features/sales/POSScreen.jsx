@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  ShoppingCart, 
-  Search, 
-  CreditCard, 
-  DollarSign, 
-  Smartphone, 
-  CheckCircle2, 
-  Receipt, 
-  FileText, 
+  ShoppingCart,
+  Search,
+  CreditCard,
+  DollarSign,
+  Smartphone,
+  CheckCircle2,
+  Receipt,
+  FileText,
   Users,
   PauseCircle,
   RotateCcw,
   UserPlus,
-  QrCode
+  QrCode,
+  Package
 } from 'lucide-react';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
@@ -26,16 +27,31 @@ import { useRBAC } from '../../core/rbac/RBACContext';
 
 function POSProductImageWithSkeleton({ src, alt }) {
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Catalogue items without a photo used to sit under a permanently pulsing
+  // placeholder, which read as "still loading" on a screen that was idle.
+  if (!src || failed) {
+    return (
+      <div
+        className="w-full h-20 rounded-2xl mb-2 grid place-items-center"
+        style={{ background: 'var(--ds-surface-sunken)', color: 'var(--ds-text-muted)' }}
+        aria-hidden="true"
+      >
+        <Package className="w-4 h-4" />
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-full h-20 bg-slate-200/80 dark:bg-slate-800/80 rounded-2xl overflow-hidden mb-2">
-      {!loaded && (
-        <div className="absolute inset-0 animate-pulse bg-slate-300/60 dark:bg-slate-700/60" />
-      )}
+    <div className="relative w-full h-20 rounded-2xl overflow-hidden mb-2" style={{ background: 'var(--ds-surface-sunken)' }}>
+      {!loaded && <div className="absolute inset-0 skeleton" aria-hidden="true" />}
       <img
         src={src}
         alt={alt}
+        loading="lazy"
         onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
         className={`w-full h-full object-cover transition-opacity duration-300 ${
           loaded ? 'opacity-100' : 'opacity-0'
         }`}
@@ -54,7 +70,8 @@ export default function POSScreen() {
     employees,
     heldCarts, 
     holdCart, 
-    processRefund
+    processRefund,
+    addNotification
   } = useMultiTenant();
   const { currentUser } = useAuth();
   const { isAtLeast } = useRBAC();
@@ -66,7 +83,7 @@ export default function POSScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [discountPercent, setDiscountPercent] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('Card');
+  const [paymentMethod, setPaymentMethod] = useState('Credit Card');
   const [selectedCustomer, setSelectedCustomer] = useState(t('pos.walk_in', 'Walk-in Customer'));
   const [cashTendered, setCashTendered] = useState('');
   const cashierStorageKey = `gurey_pos_cashier_${activeCompany?.id || 'default'}`;
@@ -129,7 +146,13 @@ export default function POSScreen() {
   };
 
   const addToCart = (product) => {
-    if (product.quantity <= 0) return alert(t('status.out_of_stock', 'Product is out of stock!'));
+    if (product.quantity <= 0) {
+      return addNotification(
+        t('status.out_of_stock', 'Out of stock'),
+        `${product.name} ${t('pos.out_of_stock_message', 'cannot be added — there is no stock left in this branch.')}`,
+        'warning'
+      );
+    }
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -151,7 +174,9 @@ export default function POSScreen() {
 
   const subtotal = cart.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
   const discountAmount = (subtotal * discountPercent) / 100;
-  const taxRate = activeCompany?.taxRate || 8.5;
+  // A configured rate of 0 is a real setting, so `??` — `||` silently
+  // replaced a zero-tax workspace with a hardcoded 8.5%.
+  const taxRate = Number(activeCompany?.taxRate ?? 0);
   const taxAmount = ((subtotal - discountAmount) * taxRate) / 100;
   const grandTotal = subtotal - discountAmount + taxAmount;
 
@@ -159,14 +184,24 @@ export default function POSScreen() {
   const changeDue = Math.max(0, cashTenderedVal - grandTotal);
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return alert(t('pos.cart_empty_title', 'Cart is empty!'));
-
-    if (paymentMethod === 'Cash' && cashTenderedVal < grandTotal) {
-      return alert(`Cash tendered ($${cashTenderedVal.toFixed(2)}) is less than total amount due ($${grandTotal.toFixed(2)})!`);
+    if (cart.length === 0) {
+      return addNotification(t('pos.cart_empty_title', 'Cart is empty'), t('pos.cart_empty_desc', 'Add at least one product before completing the sale.'), 'warning');
     }
 
-    if (!selectedCashierId) return alert('Select a cashier before completing the sale.');
-    if (selectedCashierId !== currentUser?.uid && !canAssignCashier) return alert('You are not allowed to assign another cashier.');
+    if (paymentMethod === 'Cash' && cashTenderedVal < grandTotal) {
+      return addNotification(
+        t('pos.insufficient_cash', 'Not enough cash tendered'),
+        `$${cashTenderedVal.toFixed(2)} received against a $${grandTotal.toFixed(2)} total.`,
+        'warning'
+      );
+    }
+
+    if (!selectedCashierId) {
+      return addNotification(t('pos.cashier_required', 'Select a cashier'), t('pos.cashier_required_desc', 'Every sale has to be attributed to a cashier.'), 'warning');
+    }
+    if (selectedCashierId !== currentUser?.uid && !canAssignCashier) {
+      return addNotification(t('pos.cashier_forbidden', 'Not allowed'), t('pos.cashier_forbidden_desc', 'Only managers can complete a sale on behalf of another cashier.'), 'error');
+    }
     const saleData = {
       customerName: selectedCustomer || t('pos.walk_in', 'Walk-in Customer'),
       items: cart.map(i => ({ productId: i.id, productName: i.name, quantity: i.quantity, price: i.sellingPrice, total: i.sellingPrice * i.quantity })),
@@ -195,7 +230,7 @@ export default function POSScreen() {
         formattedDate: savedSale.formattedDate || 'Just now'
       });
     } catch (err) {
-      alert(err.message || 'Failed to complete sale.');
+      addNotification(t('pos.sale_failed', 'Sale could not be completed'), err.message || t('pos.sale_failed_desc', 'The sale was not recorded. Nothing has been charged.'), 'error');
       return;
     }
 
@@ -211,7 +246,9 @@ export default function POSScreen() {
   };
 
   const handleHoldCurrentCart = () => {
-    if (cart.length === 0) return alert(t('pos.cart_empty_title', 'Cart is empty!'));
+    if (cart.length === 0) {
+      return addNotification(t('pos.cart_empty_title', 'Cart is empty'), t('pos.cart_empty_hold', 'There is nothing to hold yet.'), 'warning');
+    }
     holdCart(cart, selectedCustomer, discountPercent, `Cart with ${cart.length} item(s)`);
     setCart([]);
     setDiscountPercent(0);
@@ -227,7 +264,7 @@ export default function POSScreen() {
     if (!selectedRefundSale) return;
     processRefund(selectedRefundSale.id, selectedRefundSale.items, refundReason, 'Cash');
     setSelectedRefundSale(null);
-    alert(`Refund processed successfully for Receipt ${selectedRefundSale.receiptNumber}`);
+    addNotification(t('pos.refund_done', 'Refund processed'), `Receipt ${selectedRefundSale.receiptNumber} has been refunded.`, 'success');
   };
 
   const salesSubTabs = [
@@ -242,7 +279,7 @@ export default function POSScreen() {
     <div className="space-y-6 pb-12 page-enter">
       
       {/* Sub-Navigation Tabs for Sales Section */}
-      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10">
+      <div className="ds-tabstrip flex sm:grid sm:grid-cols-5 gap-2 p-1.5 rounded-2xl glass-panel overflow-x-auto no-scrollbar">
         {salesSubTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -314,14 +351,20 @@ export default function POSScreen() {
                     }`}
                   >
                     <div>
-                      <POSProductImageWithSkeleton src={prod.images[0]} alt={prod.name} />
+                      <POSProductImageWithSkeleton src={prod.images?.[0]} alt={prod.name} />
                       <h4 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">{prod.name}</h4>
                       <p className="truncate text-[10px] font-semibold text-slate-400">SKU: {prod.sku}</p>
                     </div>
 
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-800">
                       <span className="text-xs font-black text-slate-900 dark:text-white">${prod.sellingPrice.toFixed(2)}</span>
-                      <span className="text-[10px] font-bold text-indigo-500">Qty: {prod.quantity}</span>
+                      {prod.quantity <= 0 ? (
+                        <span className="ds-badge ds-badge-critical">{t('status.out_of_stock', 'Out of stock')}</span>
+                      ) : (
+                        <span className={`ds-badge ${prod.quantity <= prod.lowStockLevel ? 'ds-badge-warning' : 'ds-badge-neutral'}`}>
+                          {prod.quantity} {t('products.in_stock_short', 'left')}
+                        </span>
+                      )}
                     </div>
                   </button>
                 ))
@@ -461,7 +504,7 @@ export default function POSScreen() {
                   {/* Payment Method Selection */}
                   <div className="grid grid-cols-2 min-[430px]:grid-cols-3 gap-2 pt-1">
                     {[
-                      { id: 'Card', labelKey: 'pos.card', icon: CreditCard },
+                      { id: 'Credit Card', labelKey: 'pos.card', icon: CreditCard },
                       { id: 'Cash', labelKey: 'pos.cash', icon: DollarSign },
                       { id: 'Mobile Money', labelKey: 'pos.mobile_money', icon: Smartphone }
                     ].map((pm) => {

@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import ErrorBoundary from './shared/components/ErrorBoundary.jsx'
 import './index.css'
+import { purgeLegacyClientStores } from './core/storageCleanup'
+
+// Business data used to be kept in localStorage; drop any stale copies before
+// the app renders so nothing can read them.
+purgeLegacyClientStores();
 
 // Global Unhandled Exception & Promise Rejection Handlers
 window.addEventListener('error', (event) => {

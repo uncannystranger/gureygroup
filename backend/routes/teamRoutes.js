@@ -8,8 +8,9 @@ import EmployeeMember from '../models/EmployeeMember.js';
 import Organization from '../models/Organization.js';
 import Company from '../models/Company.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requirePermission, JWT_SECRET } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission, JWT_SECRET, requireVerifiedEmail } from '../middleware/auth.js';
 import { normalizePermissions, getPermissionsForRole } from '../rbac/permissions.js';
+import { resolveWorkspace } from '../services/workspace.js';
 
 const router = express.Router();
 
@@ -91,8 +92,7 @@ router.post('/invitations/accept/:token', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     const permissions = normalizePermissions(invitation.role, invitation.permissions);
-    const org = await Organization.findOne({ companyId: invitation.companyId })
-      || await Company.findOne({ companyId: invitation.companyId });
+    const org = await resolveWorkspace(invitation.companyId);
     if (!org) {
       return res.status(404).json({ error: 'The organization for this invitation no longer exists.' });
     }
@@ -112,6 +112,9 @@ router.post('/invitations/accept/:token', async (req, res) => {
       organizationId: org._id?.toString() || invitation.companyId,
       ownerId: org.ownerId || org.ownerUid || invitation.invitedBy, role: invitation.role,
       permissions, securityPinHash: hashedPin, invitedBy: invitation.invitedBy,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      emailVerificationMethod: 'invitation',
     });
 
     const membership = await Membership.findOneAndUpdate(
@@ -141,6 +144,7 @@ router.post('/invitations/accept/:token', async (req, res) => {
         uid: employee.employeeId,
         email: employee.email,
         accountType: 'employee',
+        emailVerified: true,
         companyId: invitation.companyId,
         role: membership.role,
         permissions: membership.permissions || [],
@@ -199,11 +203,10 @@ router.post('/auth/employee-login', async (req, res) => {
     }
     const membership = await Membership.findOne({ userId: employee.employeeId, companyId: employee.companyId, status: 'active' });
     if (!membership) return res.status(403).json({ error: 'Your organization membership is inactive.' });
-    const token = jwt.sign({ uid: employee.employeeId, email: employee.email, accountType: 'employee', companyId: employee.companyId, role: membership.role, permissions: membership.permissions || [] }, JWT_SECRET, { expiresIn: '7d' });
-    const organization = await Organization.findOne({ companyId: employee.companyId })
-      || await Company.findOne({ companyId: employee.companyId });
+    const token = jwt.sign({ uid: employee.employeeId, email: employee.email, accountType: 'employee', emailVerified: Boolean(employee.emailVerified), companyId: employee.companyId, role: membership.role, permissions: membership.permissions || [] }, JWT_SECRET, { expiresIn: '7d' });
+    const organization = await resolveWorkspace(employee.companyId);
     if (!organization) return res.status(404).json({ error: 'Your organization workspace could not be found.' });
-    res.json({ token, organization, user: { uid: employee.employeeId, email: employee.email, displayName: employee.displayName, photoURL: employee.photoURL, accountType: 'employee', authType: 'employee', emailVerified: true, requiresEmailVerification: false, role: membership.role, permissions: membership.permissions || [], companyId: membership.companyId } });
+    res.json({ token, organization, user: { uid: employee.employeeId, email: employee.email, displayName: employee.displayName, photoURL: employee.photoURL, accountType: 'employee', authType: 'employee', emailVerified: Boolean(employee.emailVerified), requiresEmailVerification: false, role: membership.role, permissions: membership.permissions || [], companyId: membership.companyId } });
   } catch (error) {
     console.error('Employee Login Error:', error);
     res.status(500).json({
@@ -214,6 +217,7 @@ router.post('/auth/employee-login', async (req, res) => {
 });
 
 router.use(enforceTenantIsolation);
+router.use(requireVerifiedEmail);
 
 // ─── Team Members ─────────────────────────────────────────────────────────────
 

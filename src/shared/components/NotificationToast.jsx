@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
+
+const TOAST_LIFETIME_MS = 4500;
 
 export default function NotificationToast() {
   const { notifications, markNotificationRead } = useMultiTenant();
@@ -8,29 +10,53 @@ export default function NotificationToast() {
   // Show only unread notifications (up to 3 recent ones)
   const unreadNotifs = notifications.filter(n => !n.isRead).slice(0, 3);
 
+  // The countdown bar promised an auto-dismiss that never happened, so toasts
+  // stacked up permanently until each one was clicked away.
+  const timersRef = useRef(new Map());
+  useEffect(() => {
+    const timers = timersRef.current;
+    unreadNotifs.forEach((n) => {
+      if (timers.has(n.id)) return;
+      timers.set(n.id, setTimeout(() => {
+        timers.delete(n.id);
+        markNotificationRead(n.id);
+      }, TOAST_LIFETIME_MS));
+    });
+    return undefined;
+  }, [unreadNotifs, markNotificationRead]);
+
+  useEffect(() => () => {
+    timersRef.current.forEach((timer) => clearTimeout(timer));
+    timersRef.current.clear();
+  }, []);
+
   if (unreadNotifs.length === 0) return null;
 
   return (
-    <div className="fixed bottom-3 left-3 right-3 sm:bottom-5 sm:left-auto sm:right-5 z-50 flex flex-col space-y-2.5 max-w-sm w-auto sm:w-full pointer-events-none">
+    <div
+      className="fixed bottom-3 left-3 right-3 sm:bottom-5 sm:left-auto sm:right-5 z-50 flex flex-col space-y-2.5 max-w-sm w-auto sm:w-full pointer-events-none"
+      role="status"
+      aria-live="polite"
+    >
       {unreadNotifs.map((n) => {
         let Icon = Info;
-        let borderClass = 'border-blue-500/40 bg-white/95 dark:bg-slate-900/95';
+        let borderClass = 'border-blue-500/40';
         let iconColor = 'text-blue-500 bg-blue-100 dark:bg-blue-950';
         let barColor = 'bg-blue-500';
 
         if (n.type === 'success') {
           Icon = CheckCircle2;
-          borderClass = 'border-emerald-500/40 bg-white/95 dark:bg-slate-900/95';
+          borderClass = 'border-emerald-500/40';
           iconColor = 'text-emerald-500 bg-emerald-100 dark:bg-emerald-950';
           barColor = 'bg-emerald-500';
         } else if (n.type === 'warning') {
           Icon = AlertTriangle;
-          borderClass = 'border-amber-500/40 bg-white/95 dark:bg-slate-900/95';
+          borderClass = 'border-amber-500/40';
           iconColor = 'text-amber-500 bg-amber-100 dark:bg-amber-950';
           barColor = 'bg-amber-500';
         } else if (n.type === 'error') {
           Icon = AlertCircle;
-          borderClass = 'border-rose-500/40 bg-white/95 dark:bg-slate-900/95';
+          borderClass = 'border-rose-500/40';
           iconColor = 'text-rose-500 bg-rose-100 dark:bg-rose-950';
           barColor = 'bg-rose-500';
         }
@@ -38,7 +64,7 @@ export default function NotificationToast() {
         return (
           <div 
             key={n.id} 
-            className={`pointer-events-auto relative overflow-hidden p-3.5 rounded-2xl glass-panel border ${borderClass} shadow-2xl flex items-start justify-between space-x-3 transition-all animate-dropdown`}
+            className={`pointer-events-auto relative overflow-hidden p-3.5 rounded-2xl glass glass-strong border ${borderClass} flex items-start justify-between space-x-3 toast-enter`}
           >
             <div className="flex items-start space-x-3">
               <div className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center ${iconColor}`}>
@@ -54,6 +80,7 @@ export default function NotificationToast() {
             <button 
               onClick={() => markNotificationRead(n.id)}
               className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-lg transition-colors shrink-0 btn-micro"
+              aria-label="Dismiss notification"
               title="Dismiss"
             >
               <X className="w-3.5 h-3.5" />

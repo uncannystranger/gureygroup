@@ -83,39 +83,82 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenProfile, mobile
       {/* -------------------------------------------------- */}
       {/* DESKTOP SIDEBAR (lg and up)                       */}
       {/* -------------------------------------------------- */}
-      <aside className="hidden lg:flex w-20 md:w-22 flex-col items-center justify-start pt-8 pb-6 px-3 glass-panel rounded-4xl my-4 ml-4 shadow-glass-light dark:shadow-glass-dark border border-white/60 dark:border-white/10 z-30 transition-all duration-200 shrink-0">
-        <nav className="flex flex-col space-y-4">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            const label = t(item.labelKey, item.defaultLabel);
-            return (
-              <div key={item.id} className="relative group">
-                <button
-                  onClick={() => handleSelect(item.id)}
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center btn-micro ${
-                    isActive 
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-md scale-105' 
-                      : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-white/15 hover:text-slate-900 dark:hover:text-white hover:shadow-xs'
-                  }`}
-                  aria-label={label}
-                >
-                  <Icon className={`w-5 h-5 transition-transform duration-150 ease-out ${isActive ? 'scale-110' : 'group-hover:scale-[1.06]'}`} />
-                </button>
-                
-                {/* Active Indicator glow bar */}
-                {isActive && (
-                  <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 ${activePreset.bgClass} rounded-r-full ${activePreset.glow} transition-all duration-200 ease-out`} />
-                )}
+      <aside className="hidden lg:flex w-20 flex-col items-center justify-between pt-5 pb-5 px-3 glass-panel rounded-3xl my-4 ml-4 z-30 shrink-0">
+        <div className="flex flex-col items-center gap-5 w-full">
+          {/* Brand mark — anchors the rail and gives the workspace an identity */}
+          <span
+            className="w-10 h-10 rounded-2xl capsule-mesh-gradient grid place-items-center shrink-0"
+            title={currentCompany?.name || 'Gurey Group'}
+          >
+            <Sparkles className="w-4 h-4 text-white" aria-hidden="true" />
+          </span>
 
-                {/* Floating Tooltip */}
-                <div className="absolute left-16 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-xl bg-slate-900/95 dark:bg-white/95 text-white dark:text-slate-900 text-xs font-bold opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-150 pointer-events-none whitespace-nowrap shadow-xl z-50">
-                  {label}
-                </div>
-              </div>
-            );
-          })}
-        </nav>
+          <nav aria-label="Primary" className="w-full">
+            <ul className="flex flex-col items-center gap-1.5 list-none m-0 p-0">
+              {navItems.map((item, index) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                const label = t(item.labelKey, item.defaultLabel);
+                return (
+                  <li key={item.id} className="relative group w-full flex justify-center ds-rise" style={{ '--ds-index': index }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(item.id)}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-[background-color,color,transform] duration-150 ${
+                        isActive
+                          ? 'bg-[var(--ds-accent)] text-white'
+                          : 'text-[var(--ds-text-muted)] hover:bg-[var(--ds-accent-soft)] hover:text-[var(--ds-accent)] active:scale-95'
+                      }`}
+                    >
+                      <Icon className="w-[18px] h-[18px]" aria-hidden="true" />
+                      <span className="sr-only">{label}</span>
+                    </button>
+
+                    {/* Active rail marker slides between items rather than blinking */}
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute -left-3 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-[var(--ds-accent)] transition-[height,opacity] duration-200 ease-out ${
+                        isActive ? 'h-5 opacity-100' : 'h-1 opacity-0'
+                      }`}
+                    />
+
+                    {/* Label appears on hover/keyboard focus only */}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-[3.75rem] top-1/2 -translate-y-1/2 translate-x-[-4px] opacity-0 group-hover:opacity-100 group-hover:translate-x-0 group-focus-within:opacity-100 group-focus-within:translate-x-0 transition-[opacity,transform] duration-150 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-[var(--ds-text-inverse)] bg-[var(--ds-surface-inverse)] shadow-[var(--ds-shadow-lg)] z-50"
+                    >
+                      {label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        </div>
+
+        <div className="flex flex-col items-center gap-1 w-full">
+          <div className="relative group w-full flex justify-center">
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              className="ds-icon-btn w-11 h-11 rounded-xl"
+            >
+              {themeMode === 'system'
+                ? <Monitor className="w-[18px] h-[18px]" aria-hidden="true" />
+                : darkMode
+                  ? <Sun className="w-[18px] h-[18px]" aria-hidden="true" />
+                  : <Moon className="w-[18px] h-[18px]" aria-hidden="true" />}
+              <span className="sr-only">{`Theme: ${themeMode}. Switch theme`}</span>
+            </button>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute left-[3.75rem] top-1/2 -translate-y-1/2 translate-x-[-4px] opacity-0 group-hover:opacity-100 group-hover:translate-x-0 group-focus-within:opacity-100 group-focus-within:translate-x-0 transition-[opacity,transform] duration-150 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-[var(--ds-text-inverse)] bg-[var(--ds-surface-inverse)] shadow-[var(--ds-shadow-lg)] z-50 capitalize"
+            >
+              {themeMode} theme
+            </span>
+          </div>
+        </div>
       </aside>
 
       {/* -------------------------------------------------- */}
@@ -127,7 +170,7 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenProfile, mobile
         aria-hidden="true"
       />
 
-      <aside aria-hidden={!mobileOpen} className={`lg:hidden fixed top-0 left-0 bottom-0 w-80 max-w-[88vw] glass-panel bg-white/95 dark:bg-slate-900/95 border-r border-white/60 dark:border-white/10 z-50 p-5 flex flex-col justify-between shadow-2xl transition-transform duration-300 ease-out overflow-y-auto overscroll-contain ${
+      <aside aria-hidden={!mobileOpen} className={`lg:hidden fixed top-0 left-0 bottom-0 w-80 max-w-[88vw] glass glass-strong rounded-r-3xl z-50 p-5 flex flex-col justify-between transition-transform duration-300 ease-out overflow-y-auto overscroll-contain ${
         mobileOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="space-y-4">

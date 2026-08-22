@@ -14,28 +14,44 @@ import {
   browserLocalPersistence,
   setPersistence
 } from "firebase/auth";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { getDatabase, ref as dbRef, get, set, update } from "firebase/database";
-import { getAnalytics, isSupported } from "firebase/analytics";
 
-// Gurey Group Firebase Configuration with fallback defaults matching project credentials
+/**
+ * Firebase Web configuration.
+ *
+ * Every value comes from the environment. The previous version fell back to a
+ * specific project's identifiers baked into the source, which meant any fork,
+ * preview deployment or misconfigured environment silently authenticated
+ * against that project instead of failing. See .env.example for the full list.
+ */
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyA1rLoGN2Kdh4B16lwydcE4iXZZEO9lnP4",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "saas1-e4054.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "saas1-e4054",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "saas1-e4054.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "837424861666",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:837424861666:web:3ad96b6f2b2f81b66169bb",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-8YT1KN9F4N",
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://saas1-e4054-default-rtdb.firebaseio.com",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
 };
+
+const missingConfigKeys = ['apiKey', 'authDomain', 'projectId', 'appId']
+  .filter((key) => !firebaseConfig[key]);
+
+if (missingConfigKeys.length > 0) {
+  console.error(
+    `[Gurey Group] Firebase is not configured. Missing environment ${
+      missingConfigKeys.length === 1 ? 'variable' : 'variables'
+    }: ${missingConfigKeys.map((key) => `VITE_FIREBASE_${key.replace(/([A-Z])/g, '_$1').toUpperCase()}`).join(', ')}. ` +
+    'Copy .env.example to .env and fill in the values from Firebase Console → Project settings.'
+  );
+}
 
 // Initialize Firebase App singleton
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
+// Firebase is used for identity only. Profile data and image bytes live in
+// the application's own database, reached through the API.
 export const auth = getAuth(app);
-export const storage = getStorage(app);
-export const rtdb = getDatabase(app);
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -44,13 +60,15 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
   console.warn("[Gurey Group] Firebase persistence warning:", err);
 });
 
+// Analytics is optional and never on the critical path, so it is pulled in
+// on demand instead of being bundled into the initial JavaScript payload.
 export let analytics = null;
 if (typeof window !== 'undefined' && app) {
-  isSupported().then(supported => {
-    if (supported) {
-      analytics = getAnalytics(app);
-    }
-  }).catch(() => {});
+  import("firebase/analytics")
+    .then(async ({ getAnalytics, isSupported }) => {
+      if (await isSupported()) analytics = getAnalytics(app);
+    })
+    .catch(() => {});
 }
 
 // Safe wrapper for onAuthStateChanged
@@ -77,15 +95,7 @@ export {
   sendPasswordResetEmail,
   sendEmailVerification,
   updateProfile,
-  updateEmail,
-  dbRef,
-  get,
-  set,
-  update,
-  storageRef,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject
+  updateEmail
 };
 
 export default app;

@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Session from '../models/Session.js';
 import Audit from '../models/Audit.js';
 import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
@@ -53,13 +54,12 @@ router.post('/heartbeat', async (req, res) => {
     const { uid } = req.user;
     const { sessionId } = req.body;
 
-    const filter = sessionId
-      ? { _id: sessionId }
-      : { userId: uid, isActive: true };
+    // Scope by the caller's own identity — a bare session id from the client
+    // must never be able to touch another user's or another tenant's session.
+    const filter = { userId: uid, companyId: req.tenantId, isActive: true };
+    if (mongoose.isValidObjectId(sessionId)) filter._id = sessionId;
 
-    await Session.updateMany(filter, {
-      $set: { lastActive: new Date(), isActive: true }
-    });
+    await Session.updateMany(filter, { $set: { lastActive: new Date() } });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update heartbeat.' });
@@ -75,9 +75,8 @@ router.post('/logout', async (req, res) => {
     const { uid } = req.user;
     const { sessionId } = req.body;
 
-    const filter = sessionId
-      ? { _id: sessionId }
-      : { userId: uid, isActive: true };
+    const filter = { userId: uid, companyId: req.tenantId, isActive: true };
+    if (mongoose.isValidObjectId(sessionId)) filter._id = sessionId;
 
     await Session.updateMany(filter, {
       isActive: false,
@@ -100,8 +99,8 @@ router.post('/logout-other-devices', async (req, res) => {
     const { uid } = req.user;
     const { currentSessionId } = req.body;
 
-    const filter = { userId: uid, isActive: true };
-    if (currentSessionId) filter._id = { $ne: currentSessionId };
+    const filter = { userId: uid, companyId: req.tenantId, isActive: true };
+    if (mongoose.isValidObjectId(currentSessionId)) filter._id = { $ne: currentSessionId };
 
     const result = await Session.updateMany(filter, {
       isActive: false,
@@ -161,6 +160,9 @@ router.get('/active', requirePermission('sessions:view'), async (req, res) => {
  */
 router.delete('/:id', requirePermission('sessions:view'), async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid session identifier.' });
+    }
     const session = await Session.findOneAndUpdate(
       { _id: req.params.id, companyId: req.tenantId },
       { isActive: false, logoutTime: new Date() },

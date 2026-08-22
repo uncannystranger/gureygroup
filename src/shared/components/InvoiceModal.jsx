@@ -107,7 +107,7 @@ export default function InvoiceModal({ isOpen, onClose, sale }) {
               </div>
             )}
             <div className="flex justify-between font-bold text-slate-600 dark:text-slate-400">
-              <span>{t('common.tax', 'Sales Tax')} ({activeCompany?.taxRate || 8.5}%):</span>
+              <span>{t('common.tax', 'Sales Tax')} ({Number(activeCompany?.taxRate ?? 0)}%):</span>
               <span>${sale.tax?.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-black text-base pt-2 border-t border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">

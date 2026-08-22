@@ -16,27 +16,45 @@ import {
   RotateCcw,
   DollarSign,
   Truck,
-  PackageOpen
+  PackageOpen,
+  ImageOff
 } from 'lucide-react';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
 import QuickEditProductModal from '../../shared/components/QuickEditProductModal';
 import StockAdjustmentModal from '../../shared/components/StockAdjustmentModal';
 import ConfirmationModal from '../../shared/components/ConfirmationModal';
+import { SkeletonCardGrid, ErrorState } from '../../shared/ui/States';
 
 function ProductImageWithSkeleton({ src, alt }) {
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Without a source there is nothing to wait for: the old version left a
+  // shimmering placeholder running forever on every product with no photo.
+  if (!src || failed) {
+    return (
+      <div
+        className="w-full h-full grid place-items-center gap-1.5"
+        style={{ background: 'var(--ds-surface-sunken)', color: 'var(--ds-text-muted)' }}
+      >
+        <ImageOff className="w-5 h-5" aria-hidden="true" />
+        <span className="ds-caption text-[10px]">No image</span>
+        <span className="sr-only">{alt}</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-full h-full bg-slate-200/80 dark:bg-slate-800/80 overflow-hidden">
-      {!loaded && (
-        <div className="absolute inset-0 animate-pulse bg-slate-300/60 dark:bg-slate-700/60" />
-      )}
+    <div className="relative w-full h-full overflow-hidden" style={{ background: 'var(--ds-surface-sunken)' }}>
+      {!loaded && <div className="absolute inset-0 skeleton" aria-hidden="true" />}
       <img
         src={src}
         alt={alt}
+        loading="lazy"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
+        onError={() => setFailed(true)}
+        className={`w-full h-full object-cover transition-[opacity,transform] duration-300 group-hover:scale-105 ${
           loaded ? 'opacity-100' : 'opacity-0'
         }`}
       />
@@ -54,10 +72,15 @@ export default function ProductsScreen({ onOpenAddProduct }) {
     bulkPriceUpdate, 
     bulkStockUpdate, 
     bulkArchiveProducts,
-    stockAdjustments
+    stockAdjustments,
+    dataStatus,
+    dataError,
+    refreshWorkspaceData
   } = useMultiTenant();
 
   const { t, formatDate } = useLanguage();
+  const productsStatus = dataStatus?.products ?? 'ready';
+  const productsError = dataError?.products;
 
   const [activeSubTab, setActiveSubTab] = useState('catalog');
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,7 +100,22 @@ export default function ProductsScreen({ onOpenAddProduct }) {
   const [isBulkPriceOpen, setIsBulkPriceOpen] = useState(false);
   const [bulkPriceChange, setBulkPriceChange] = useState(10);
 
-  const categories = ['All', 'Makeup', 'Skincare', 'Fragrance', 'Haircare'];
+  // Categories come from the catalogue itself. The previous hardcoded list
+  // ("Makeup", "Skincare", …) matched no real product, so every filter chip
+  // returned an empty result for any workspace that isn't a cosmetics store.
+  const catalogCategories = React.useMemo(
+    () => [...new Set(products.filter(p => p.category).map(p => p.category))].sort((a, b) => a.localeCompare(b)),
+    [products]
+  );
+  const categories = ['All', ...catalogCategories];
+
+  // A selected category can vanish when the catalogue changes; fall back to All
+  // rather than silently showing an empty list.
+  React.useEffect(() => {
+    if (selectedCategory !== 'All' && !catalogCategories.includes(selectedCategory)) {
+      setSelectedCategory('All');
+    }
+  }, [catalogCategories, selectedCategory]);
 
   // Active Catalog Products
   const activeProducts = products.filter(p => !p.isArchived);
@@ -171,7 +209,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
       </div>
 
       {/* Merged Section Sub-Navigation Tabs */}
-      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10">
+      <div className="ds-tabstrip flex md:grid md:grid-cols-6 gap-2 p-1.5 rounded-2xl glass-panel overflow-x-auto no-scrollbar">
         {subTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -313,8 +351,18 @@ export default function ProductsScreen({ onOpenAddProduct }) {
 
           </div>
 
-          {/* Empty State / Product Cards Grid */}
-          {filtered.length === 0 ? (
+          {/* Loading and failure are distinct from "you have no products yet" */}
+          {productsStatus === 'loading' || productsStatus === 'idle' ? (
+            <SkeletonCardGrid count={6} className="lg:grid-cols-3" />
+          ) : productsStatus === 'error' ? (
+            <div className="glass-panel rounded-3xl">
+              <ErrorState
+                title="Couldn't load the catalog"
+                description={productsError}
+                onRetry={refreshWorkspaceData}
+              />
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-center p-8 rounded-4xl glass-panel border border-dashed border-slate-300 dark:border-slate-700 space-y-4 animate-fade-scale">
               <div className="w-16 h-16 rounded-3xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-500 flex items-center justify-center shadow-inner">
                 <PackageOpen className="w-8 h-8" />
@@ -363,7 +411,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
 
                       <div className="relative h-44 rounded-3xl overflow-hidden mb-4 bg-slate-100 dark:bg-slate-800">
                         <ProductImageWithSkeleton 
-                          src={prod.images[0]} 
+                          src={prod.images?.[0]} 
                           alt={prod.name} 
                         />
                         <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -411,6 +459,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
                         <button 
                           onClick={() => setQuickEditProd(prod)}
                           className="p-1.5 rounded-xl bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-indigo-500 hover:text-white transition-colors btn-micro"
+                          aria-label={`${t('products.quick_edit', 'Quick edit')} — ${prod.name}`}
                           title="Quick Edit Price & Stock"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
@@ -419,6 +468,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
                         <button 
                           onClick={() => duplicateProduct(prod.id)}
                           className="p-1.5 rounded-xl bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-indigo-500 hover:text-white transition-colors btn-micro"
+                          aria-label={`${t('products.duplicate', 'Duplicate')} — ${prod.name}`}
                           title="Duplicate Product"
                         >
                           <Copy className="w-3.5 h-3.5" />
@@ -427,6 +477,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
                         <button 
                           onClick={() => setStockAdjProd(prod)}
                           className="p-1.5 rounded-xl bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-indigo-500 hover:text-white transition-colors btn-micro"
+                          aria-label={`${t('products.adjust_stock', 'Adjust stock')} — ${prod.name}`}
                           title="Log Stock Intake / Write-off"
                         >
                           <Boxes className="w-3.5 h-3.5" />
@@ -436,6 +487,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
                           <button 
                             onClick={() => restoreProduct(prod.id)}
                             className="p-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-colors btn-micro"
+                            aria-label={`${t('products.restore', 'Restore')} — ${prod.name}`}
                             title="Restore Product"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
@@ -444,6 +496,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
                           <button 
                             onClick={() => setConfirmArchiveId(prod.id)}
                             className="p-1.5 rounded-xl bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-amber-500 hover:text-white transition-colors btn-micro"
+                            aria-label={`${t('products.archive', 'Archive')} — ${prod.name}`}
                             title="Archive Product"
                           >
                             <Archive className="w-3.5 h-3.5" />
@@ -451,7 +504,9 @@ export default function ProductsScreen({ onOpenAddProduct }) {
                         )}
                       </div>
 
-                      <span className="text-[10px] font-semibold text-slate-400">Exp: {formatDate(prod.expiryDate)}</span>
+                      <span className="ds-caption text-[10px] shrink-0">
+                        {prod.updatedAt ? `${t('common.updated', 'Updated')} ${formatDate(prod.updatedAt)}` : prod.supplier}
+                      </span>
                     </div>
 
                   </div>
@@ -466,9 +521,9 @@ export default function ProductsScreen({ onOpenAddProduct }) {
       {/* Sub-Tab 2: Categories & Brands */}
       {activeSubTab === 'categories' && (
         <div className="glass-panel rounded-4xl p-6 space-y-6 card-hover-lift">
-          <h3 className="text-base font-black text-slate-900 dark:text-white">Cosmetics Classification & Brand Portfolios</h3>
+          <h3 className="ds-title">{t('products.category', 'Categories')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {['Makeup', 'Skincare', 'Fragrance', 'Haircare'].map((cat) => {
+            {catalogCategories.map((cat) => {
               const catProds = products.filter(p => !p.isArchived && p.category === cat);
               const catStockVal = catProds.reduce((acc, p) => acc + (p.sellingPrice * p.quantity), 0);
 

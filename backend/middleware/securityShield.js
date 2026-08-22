@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-
 // In-memory threat event log for real-time monitoring
 const securityEvents = [];
 const MAX_EVENTS = 200;

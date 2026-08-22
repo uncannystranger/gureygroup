@@ -483,7 +483,9 @@ html.theme-transition select {
 /* Shared responsive primitives. Keep overflow inside the component rather
    than allowing a wide child to widen the application viewport. */
 .responsive-table-wrapper { max-width: 100%; }
-.responsive-table-wrapper > table { width: max-content; max-width: none; }
+/* Fill the panel when the columns fit, and only then grow past it and scroll.
+   The previous `width: max-content` left narrow tables hugging the left edge. */
+.responsive-table-wrapper > table { width: max-content; min-width: 100%; max-width: none; }
 
 .modal-overlay {
   overscroll-behavior: contain;
@@ -671,3 +673,755 @@ html.theme-transition select {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ==================================================================== */
+/* DESIGN SYSTEM                                                        */
+/* One source of truth for colour, elevation, rhythm and motion.        */
+/* Components consume these tokens instead of picking ad-hoc values.    */
+/* ==================================================================== */
+
+:root {
+  /* Canvas & surfaces */
+  --ds-canvas:            #eceef5;
+  --ds-canvas-tint:       #e2e6f0;
+  --ds-surface:           #ffffff;
+  --ds-surface-muted:     #f5f7fb;
+  --ds-surface-sunken:    #e9edf5;
+  --ds-surface-inverse:   #0d1018;
+
+  /* Lines */
+  --ds-border:            rgba(15, 23, 42, 0.09);
+  --ds-border-strong:     rgba(15, 23, 42, 0.16);
+
+  /* Text */
+  --ds-text:              #0d1425;
+  --ds-text-secondary:    #47536b;
+  --ds-text-muted:        #6b7690;
+  --ds-text-inverse:      #ffffff;
+
+  /* Accent — one hue family carries the whole product. A deep indigo reads as
+     considered rather than loud, and holds contrast on glass in both modes. */
+  --ds-accent:            #4a49d6;
+  --ds-accent-hover:      #3d3cba;
+  --ds-accent-soft:       rgba(74, 73, 214, 0.10);
+  --ds-accent-ring:       rgba(74, 73, 214, 0.32);
+  --ds-accent-contrast:   #ffffff;
+  /* Secondary accent, used sparingly for informational emphasis only. */
+  --ds-accent-2:          #0d7490;
+  --ds-accent-2-soft:     rgba(13, 116, 144, 0.10);
+
+  /* Status */
+  --ds-positive:          #047857;
+  --ds-positive-soft:     rgba(4, 120, 87, 0.10);
+  --ds-warning:           #b45309;
+  --ds-warning-soft:      rgba(180, 83, 9, 0.10);
+  --ds-critical:          #be123c;
+  --ds-critical-soft:     rgba(190, 18, 60, 0.10);
+  --ds-info:              #1d4ed8;
+  --ds-info-soft:         rgba(29, 78, 216, 0.10);
+
+  /* Elevation — restrained, never more than three levels in one view */
+  --ds-shadow-sm:  0 1px 2px rgba(15, 23, 42, 0.05);
+  --ds-shadow-md:  0 4px 16px -4px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --ds-shadow-lg:  0 24px 48px -18px rgba(15, 23, 42, 0.22), 0 2px 8px rgba(15, 23, 42, 0.06);
+
+  /* Radius scale */
+  --ds-radius-sm: 0.5rem;
+  --ds-radius-md: 0.75rem;
+  --ds-radius-lg: 1rem;
+  --ds-radius-xl: 1.25rem;
+  --ds-radius-2xl: 1.5rem;
+
+  /* Motion — fast, purposeful, one easing family */
+  --ds-ease:        cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ds-ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ds-duration-1:  120ms;   /* state change on a control        */
+  --ds-duration-2:  180ms;   /* hover / press / small reveal     */
+  --ds-duration-3:  260ms;   /* panels, modals, page transitions */
+}
+
+.dark {
+  --ds-canvas:            #070a12;
+  --ds-canvas-tint:       #0b0f1a;
+  --ds-surface:           #121723;
+  --ds-surface-muted:     #171d2b;
+  --ds-surface-sunken:    #0c111c;
+  --ds-surface-inverse:   #f8fafc;
+
+  --ds-border:            rgba(148, 163, 184, 0.14);
+  --ds-border-strong:     rgba(148, 163, 184, 0.26);
+
+  --ds-text:              #f1f5f9;
+  --ds-text-secondary:    #bcc5d6;
+  /* Measured against --ds-surface: the previous #8590a8 sat at 3.2:1, under
+     the 4.5:1 WCAG AA threshold for body text. */
+  --ds-text-muted:        #98a2ba;
+  --ds-text-inverse:      #0b1120;
+
+  --ds-accent:            #7c7bf5;
+  --ds-accent-hover:      #9a99f8;
+  --ds-accent-soft:       rgba(124, 123, 245, 0.16);
+  --ds-accent-ring:       rgba(124, 123, 245, 0.42);
+  --ds-accent-2:          #38bdf8;
+  --ds-accent-2-soft:     rgba(56, 189, 248, 0.14);
+
+  --ds-positive:          #34d399;
+  --ds-positive-soft:     rgba(52, 211, 153, 0.14);
+  --ds-warning:           #fbbf24;
+  --ds-warning-soft:      rgba(251, 191, 36, 0.14);
+  --ds-critical:          #fb7185;
+  --ds-critical-soft:     rgba(251, 113, 133, 0.14);
+  --ds-info:              #60a5fa;
+  --ds-info-soft:         rgba(96, 165, 250, 0.14);
+
+  --ds-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.4);
+  --ds-shadow-md:  0 4px 20px -6px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --ds-shadow-lg:  0 28px 56px -20px rgba(0, 0, 0, 0.75), 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* -------------------------------------------------------------------- */
+/* Surfaces                                                             */
+/* The former treatment leaned on heavy blur + saturation, which muddied */
+/* text and cost paint time. Panels are now solid with a single hairline */
+/* and one shadow step, so type stays crisp and hierarchy stays readable.*/
+/* -------------------------------------------------------------------- */
+.glass-panel,
+.ds-surface {
+  background: var(--ds-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--ds-border);
+  box-shadow: var(--ds-shadow-md);
+}
+
+.dark .glass-panel,
+.dark .ds-surface {
+  background: var(--ds-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--ds-border);
+  box-shadow: var(--ds-shadow-md);
+}
+
+@media (max-width: 639px) {
+  .glass-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Blur is reserved for the one place it reads as depth: overlay scrims. */
+.ds-scrim {
+  background: rgba(9, 12, 20, 0.55);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+}
+
+.ds-surface-muted  { background: var(--ds-surface-muted); }
+.ds-surface-sunken { background: var(--ds-surface-sunken); }
+
+.ds-hairline       { border-color: var(--ds-border); }
+.ds-hairline-strong{ border-color: var(--ds-border-strong); }
+
+/* -------------------------------------------------------------------- */
+/* Typography rhythm                                                    */
+/* -------------------------------------------------------------------- */
+.ds-display {
+  font-size: clamp(1.5rem, 1.15rem + 1.4vw, 2.125rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  color: var(--ds-text);
+}
+
+.ds-title {
+  font-size: clamp(1.0625rem, 0.98rem + 0.4vw, 1.25rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.ds-heading {
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  font-weight: 650;
+  color: var(--ds-text);
+}
+
+.ds-body       { font-size: 0.875rem; line-height: 1.55; color: var(--ds-text-secondary); }
+.ds-caption    { font-size: 0.75rem;  line-height: 1.45; color: var(--ds-text-muted); }
+
+.ds-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+
+/* Tabular figures keep money and counts from shifting as they animate. */
+.ds-numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.02em;
+}
+
+/* -------------------------------------------------------------------- */
+/* Buttons                                                              */
+/* -------------------------------------------------------------------- */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding-inline: 1rem;
+  border-radius: var(--ds-radius-md);
+  border: 1px solid transparent;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--ds-duration-1) var(--ds-ease),
+    border-color var(--ds-duration-1) var(--ds-ease),
+    color var(--ds-duration-1) var(--ds-ease),
+    box-shadow var(--ds-duration-2) var(--ds-ease),
+    transform var(--ds-duration-1) var(--ds-ease);
+}
+
+.ds-btn:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
+
+.ds-btn:disabled,
+.ds-btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ds-btn-primary {
+  background: var(--ds-accent);
+  color: var(--ds-accent-contrast);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+.ds-btn-primary:hover:not(:disabled) {
+  background: var(--ds-accent-hover);
+  box-shadow: 0 6px 18px -6px var(--ds-accent-ring);
+}
+
+.ds-btn-secondary {
+  background: var(--ds-surface);
+  border-color: var(--ds-border-strong);
+  color: var(--ds-text);
+}
+.ds-btn-secondary:hover:not(:disabled) {
+  background: var(--ds-surface-muted);
+  border-color: var(--ds-accent);
+  color: var(--ds-accent);
+}
+
+.ds-btn-ghost {
+  background: transparent;
+  color: var(--ds-text-secondary);
+}
+.ds-btn-ghost:hover:not(:disabled) {
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent);
+}
+
+.ds-btn-danger {
+  background: var(--ds-critical);
+  color: #fff;
+}
+.ds-btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+
+.ds-btn-sm { height: 2.125rem; padding-inline: 0.75rem; font-size: 0.75rem; }
+.ds-btn-lg { height: 2.875rem; padding-inline: 1.25rem; font-size: 0.875rem; }
+
+/* Icon-only control — square, centred, same interaction language */
+.ds-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--ds-radius-md);
+  color: var(--ds-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background-color var(--ds-duration-1) var(--ds-ease),
+    color var(--ds-duration-1) var(--ds-ease),
+    transform var(--ds-duration-1) var(--ds-ease);
+}
+.ds-icon-btn:hover {
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent);
+}
+.ds-icon-btn:active { transform: scale(0.94); }
+
+/* -------------------------------------------------------------------- */
+/* Form fields                                                          */
+/* -------------------------------------------------------------------- */
+.ds-field {
+  width: 100%;
+  height: 2.5rem;
+  padding-inline: 0.75rem;
+  border-radius: var(--ds-radius-md);
+  border: 1px solid var(--ds-border-strong);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+  font-size: 0.875rem;
+  transition:
+    border-color var(--ds-duration-1) var(--ds-ease),
+    box-shadow var(--ds-duration-2) var(--ds-ease),
+    background-color var(--ds-duration-1) var(--ds-ease);
+}
+
+.ds-field::placeholder { color: var(--ds-text-muted); }
+
+.ds-field:hover:not(:disabled) { border-color: var(--ds-border-strong); }
+
+.ds-field:focus,
+.ds-field:focus-visible {
+  outline: none;
+  background: var(--ds-surface);
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 3px var(--ds-accent-ring);
+}
+
+.ds-field[aria-invalid="true"] {
+  border-color: var(--ds-critical);
+  box-shadow: 0 0 0 3px var(--ds-critical-soft);
+}
+
+.ds-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--ds-text-secondary);
+  margin-bottom: 0.375rem;
+}
+
+.ds-hint  { font-size: 0.6875rem; color: var(--ds-text-muted); margin-top: 0.375rem; }
+.ds-error { font-size: 0.6875rem; color: var(--ds-critical); margin-top: 0.375rem; font-weight: 600; }
+
+/* -------------------------------------------------------------------- */
+/* Badges & status                                                      */
+/* -------------------------------------------------------------------- */
+.ds-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+
+/* Status reads from a dot + label, never from colour alone. */
+.ds-badge::before {
+  content: "";
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: currentColor;
+  flex: none;
+}
+
+.ds-badge-neutral  { background: var(--ds-surface-sunken); color: var(--ds-text-secondary); }
+.ds-badge-positive { background: var(--ds-positive-soft);  color: var(--ds-positive); }
+.ds-badge-warning  { background: var(--ds-warning-soft);   color: var(--ds-warning); }
+.ds-badge-critical { background: var(--ds-critical-soft);  color: var(--ds-critical); }
+.ds-badge-accent   { background: var(--ds-accent-soft);    color: var(--ds-accent); }
+.ds-badge-plain::before { display: none; }
+
+/* -------------------------------------------------------------------- */
+/* Micro-interactions                                                   */
+/* Movement is small (≤3px), fast, and always tied to an intent.        */
+/* -------------------------------------------------------------------- */
+.ds-interactive {
+  transition:
+    transform var(--ds-duration-2) var(--ds-ease),
+    box-shadow var(--ds-duration-2) var(--ds-ease),
+    border-color var(--ds-duration-2) var(--ds-ease);
+}
+.ds-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ds-shadow-lg);
+  border-color: var(--ds-border-strong);
+}
+.ds-interactive:active { transform: translateY(0); }
+
+/* Underline that grows from the leading edge on hover */
+.ds-link {
+  position: relative;
+  color: var(--ds-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ds-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--ds-duration-2) var(--ds-ease);
+}
+.ds-link:hover::after { transform: scaleX(1); }
+
+/* Entrance stagger: set --ds-index on each child */
+@keyframes dsRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ds-rise {
+  animation: dsRise var(--ds-duration-3) var(--ds-ease-out) both;
+  animation-delay: calc(var(--ds-index, 0) * 45ms);
+}
+
+/* Value change pulse — draws the eye to a number that just updated */
+@keyframes dsValuePulse {
+  0%   { transform: translateY(3px); opacity: 0; }
+  100% { transform: translateY(0);   opacity: 1; }
+}
+.ds-value-in { animation: dsValuePulse var(--ds-duration-2) var(--ds-ease-out) both; }
+
+/* Indeterminate progress line for background refreshes */
+@keyframes dsIndeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.4); }
+  100% { transform: translateX(220%)  scaleX(0.4); }
+}
+.ds-progress-line {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--ds-accent-soft);
+}
+.ds-progress-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ds-accent);
+  animation: dsIndeterminate 1.1s var(--ds-ease) infinite;
+}
+
+/* -------------------------------------------------------------------- */
+/* Tables                                                               */
+/* -------------------------------------------------------------------- */
+.ds-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.ds-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ds-surface-muted);
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+  border-bottom: 1px solid var(--ds-border);
+  white-space: nowrap;
+}
+
+.ds-table tbody td {
+  padding: 0.75rem 0.875rem;
+  border-bottom: 1px solid var(--ds-border);
+  color: var(--ds-text-secondary);
+  vertical-align: middle;
+}
+
+.ds-table tbody tr:last-child td { border-bottom: 0; }
+
+.ds-table tbody tr {
+  transition: background-color var(--ds-duration-1) var(--ds-ease);
+}
+.ds-table tbody tr:hover { background: var(--ds-accent-soft); }
+
+.ds-table .ds-cell-strong { color: var(--ds-text); font-weight: 650; }
+.ds-table .ds-cell-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ds-text);
+  font-weight: 650;
+}
+
+/* -------------------------------------------------------------------- */
+/* Focus visibility                                                     */
+/* -------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+
+/* A pointer press should not paint a keyboard ring. */
+:focus:not(:focus-visible) { outline: none; }
+
+/* -------------------------------------------------------------------- */
+/* Reduced motion                                                       */
+/* Movement is removed; opacity fades stay so state changes remain       */
+/* perceivable rather than snapping.                                     */
+/* -------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .ds-interactive:hover,
+  .ds-btn:active:not(:disabled),
+  .ds-icon-btn:active,
+  .card-hover-lift:hover,
+  .fab:hover,
+  .fab:active {
+    transform: none !important;
+  }
+
+  .ds-progress-line::after,
+  .animate-float,
+  .animate-pulse-glow,
+  .animate-spin-slow,
+  .animate-session-orb,
+  .skeleton {
+    animation: none !important;
+  }
+
+  .ds-link::after { transition: none; transform: scaleX(1); }
+}
+
+/* -------------------------------------------------------------------- */
+/* Application canvas                                                   */
+/* A single very low-contrast ambient wash gives the page depth without  */
+/* the page-wide gradients that make dashboards look like landing pages. */
+/* -------------------------------------------------------------------- */
+body {
+  background-color: var(--ds-canvas);
+  color: var(--ds-text);
+}
+
+.ds-app-shell {
+  position: relative;
+  background-color: var(--ds-canvas);
+  background-image:
+    radial-gradient(1100px 520px at 12% -8%, var(--ds-accent-soft), transparent 60%),
+    radial-gradient(900px 480px at 92% 0%, rgba(56, 189, 248, 0.07), transparent 62%);
+  background-attachment: fixed;
+}
+
+/* Section header: title, supporting line, and actions on one baseline */
+.ds-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.ds-page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Empty / error states share one silhouette so the app feels coherent
+   whichever "nothing to show" case the user lands on. */
+.ds-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+}
+
+.ds-state__icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent);
+  margin-bottom: 0.25rem;
+}
+
+.ds-state__icon--critical { background: var(--ds-critical-soft); color: var(--ds-critical); }
+
+/* Horizontally scrollable tab strip for narrow viewports. Tabs keep their
+   natural width and the strip scrolls, instead of stacking into a tall column
+   that pushes the actual content off screen. */
+.ds-tabstrip > * {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.ds-tabstrip {
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+@media (min-width: 640px) {
+  .ds-tabstrip > * { flex: 1 1 auto; }
+}
+
+/* Keep the floating assistant button from covering the last row of content
+   on touch viewports, where there is no room to scroll past it. */
+@media (max-width: 1023px) {
+  #workspace-main { padding-bottom: 4.5rem; }
+}
+
+/* ==================================================================== */
+/* LIQUID GLASS                                                         */
+/*                                                                      */
+/* Translucency is treated as a material, not a filter. A glass surface  */
+/* is four things stacked: a tinted translucent base, a saturating blur  */
+/* of what sits behind it, a hairline edge, and a specular highlight     */
+/* along the top edge where light would catch a real bevel.              */
+/*                                                                      */
+/* It is applied to chrome — navigation, headers, sheets, popovers,      */
+/* toasts — and deliberately NOT to dense content, which stays on solid  */
+/* surfaces so text never competes with what is behind it.               */
+/* ==================================================================== */
+
+:root {
+  /* Base tint of the material itself */
+  --glass-tint:        rgba(255, 255, 255, 0.62);
+  --glass-tint-strong: rgba(255, 255, 255, 0.80);
+  --glass-tint-faint:  rgba(255, 255, 255, 0.40);
+
+  /* Edge + specular highlight */
+  --glass-edge:        rgba(255, 255, 255, 0.70);
+  --glass-edge-outer:  rgba(15, 23, 42, 0.08);
+  --glass-specular:    rgba(255, 255, 255, 0.95);
+
+  /* Optical properties */
+  --glass-blur:        22px;
+  --glass-saturate:    180%;
+
+  /* Depth cast by a floating pane */
+  --glass-shadow:
+    0 1px 1px rgba(15, 23, 42, 0.04),
+    0 8px 24px -8px rgba(15, 23, 42, 0.14),
+    0 24px 56px -24px rgba(15, 23, 42, 0.22);
+}
+
+.dark {
+  --glass-tint:        rgba(24, 30, 45, 0.58);
+  --glass-tint-strong: rgba(24, 30, 45, 0.80);
+  --glass-tint-faint:  rgba(24, 30, 45, 0.38);
+
+  --glass-edge:        rgba(255, 255, 255, 0.10);
+  --glass-edge-outer:  rgba(0, 0, 0, 0.55);
+  --glass-specular:    rgba(255, 255, 255, 0.22);
+
+  --glass-blur:        24px;
+  --glass-saturate:    170%;
+
+  --glass-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.35),
+    0 10px 28px -10px rgba(0, 0, 0, 0.60),
+    0 28px 64px -28px rgba(0, 0, 0, 0.75);
+}
+
+/**
+ * The material.
+ *
+ * The top-edge highlight is painted as a background layer rather than a
+ * positioned pseudo-element: forcing `position: relative` here silently
+ * overrode `position: fixed`/`absolute` on any element that also used this
+ * class, which pulled fixed overlays back into normal flow.
+ */
+.glass {
+  background-color: var(--glass-tint);
+  background-image: linear-gradient(to bottom, var(--glass-specular) 0, transparent 2px);
+  background-repeat: no-repeat;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Weights, so a hierarchy of panes reads as different depths rather than the
+   same effect repeated. */
+.glass-strong { background-color: var(--glass-tint-strong); --glass-blur: 30px; }
+.glass-faint  { background-color: var(--glass-tint-faint);  --glass-blur: 16px; }
+
+/* Chrome that sits above scrolling content and must stay legible over it. */
+.glass-chrome {
+  background-color: var(--glass-tint-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    0 1px 0 var(--glass-edge-outer),
+    0 6px 20px -12px rgba(15, 23, 42, 0.30);
+}
+
+/* Modal scrim: the one place a heavy blur is correct, because everything
+   behind it is intentionally out of reach. */
+.glass-scrim {
+  background: rgba(9, 12, 20, 0.42);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+.dark .glass-scrim { background: rgba(3, 5, 10, 0.60); }
+
+/**
+ * Content panels stay opaque. Readability outranks the effect, so the same
+ * `.glass-panel` class used across the app resolves to a solid surface, while
+ * the chrome above opts into the material explicitly.
+ */
+.glass-panel,
+.ds-surface {
+  background: var(--ds-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--ds-border);
+  box-shadow: var(--ds-shadow-md);
+}
+
+/* Where a panel should feel like it is floating over the canvas rather than
+   printed on it — opt in per component. */
+.glass-panel.is-floating {
+  background-color: var(--glass-tint);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Backdrop-filter is expensive and, on browsers without support, a translucent
+   tint over busy content is unreadable. Fall back to a solid surface. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-chrome,
+  .glass-panel.is-floating {
+    background-color: var(--ds-surface);
+  }
+  .glass-scrim { background: rgba(9, 12, 20, 0.86); }
+}
+
+/* Blur at this radius is costly to composite on low-power devices; the tint
+   and edge carry the design on their own. */
+@media (max-width: 767px) {
+  :root, .dark { --glass-blur: 14px; }
+}
+

@@ -1,10 +1,11 @@
 import express from 'express';
 import Attendance from '../models/Attendance.js';
 import Audit from '../models/Audit.js';
-import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission, requireVerifiedEmail } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
+router.use(requireVerifiedEmail);
 
 /**
  * POST /api/attendance/check-in
@@ -18,7 +19,7 @@ router.post('/check-in', requirePermission('attendance:check_in'), async (req, r
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
     // Check if already checked in today
-    const existing = await Attendance.findOne({ userId: uid, date: today });
+    const existing = await Attendance.findOne({ userId: uid, companyId, date: today });
     if (existing) {
       if (existing.checkIn && !existing.checkOut) {
         return res.status(400).json({ error: 'Already checked in. Please check out first.' });
@@ -34,7 +35,7 @@ router.post('/check-in', requirePermission('attendance:check_in'), async (req, r
     const isLate = checkInHour >= 9;
 
     const attendance = await Attendance.findOneAndUpdate(
-      { userId: uid, date: today },
+      { userId: uid, companyId, date: today },
       {
         $set: {
           userId: uid,
@@ -73,7 +74,7 @@ router.post('/check-out', async (req, res) => {
     const { uid, email } = req.user;
     const today = new Date().toISOString().split('T')[0];
 
-    const attendance = await Attendance.findOne({ userId: uid, date: today });
+    const attendance = await Attendance.findOne({ userId: uid, companyId: req.tenantId, date: today });
     if (!attendance || !attendance.checkIn) {
       return res.status(400).json({ error: 'You have not checked in today.' });
     }
@@ -132,7 +133,7 @@ router.get('/my', async (req, res) => {
     const { uid } = req.user;
     const { from, to, limit } = req.query;
 
-    const filter = { userId: uid };
+    const filter = { userId: uid, companyId: req.tenantId };
     if (from || to) {
       filter.date = {};
       if (from) filter.date.$gte = from;

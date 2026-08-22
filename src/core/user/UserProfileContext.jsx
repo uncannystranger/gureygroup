@@ -1,11 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import {
-  loadUserProfile,
-  uploadProfileImage,
-  getLocalCacheKey
-} from './userProfileService';
+import { getLocalCacheKey } from './userProfileService';
+import { uploadImage, dataUriToFile } from '../../shared/lib/imageUpload';
 import { authAPI } from '../../services/apiService';
 
 const UserProfileContext = createContext();
@@ -116,9 +113,16 @@ export function UserProfileProvider({ children }) {
       isHydratingRef.current = false;
       if (!backendUser) return;
 
+      // Stored fields default to empty strings. Spreading them raw would blank
+      // out values we successfully derived from the signed-in account (e.g. a
+      // first name split from displayName), so only real values win.
+      const storedValues = Object.fromEntries(
+        Object.entries(backendUser).filter(([, value]) => value !== null && value !== undefined && value !== '')
+      );
+
       const merged = {
         ...getDerivedProfile(currentUser, tenantCompany),
-        ...backendUser,
+        ...storedValues,
         email: currentUser.email || backendUser.email,
         displayName: backendUser.displayName || currentUser.displayName,
         photo: backendUser.photoURL || currentUser.photoURL
@@ -187,23 +191,27 @@ export function UserProfileProvider({ children }) {
     const uid = currentUser?.uid;
     const nextProfile = { ...profile, ...updatedFields };
 
-    // Handle photo persistence
+    /**
+     * Avatar persistence.
+     *
+     * The previous implementation tried Firebase Storage and, on any failure,
+     * silently stored the raw base64 data URI on the user record instead. That
+     * put megabytes into the document, bloated every /auth/me response, and
+     * could exceed the JSON body limit — so the "fallback" was itself the bug.
+     *
+     * The image now goes to the backend asset store as multipart and only the
+     * returned URL is persisted. A failure is reported, never worked around.
+     */
     if (updatedFields.photo && uid) {
       if (updatedFields.photo.startsWith('data:')) {
-        // Data URI from file upload / camera / crop → try Storage first
-        try {
-          const downloadURL = await uploadProfileImage(uid, updatedFields.photo);
-          nextProfile.photo = downloadURL;
-          nextProfile.photoURL = downloadURL;
-        } catch (err) {
-          console.warn('[UserProfileContext] Storage upload failed, saving photo URL to RTDB directly:', err);
-          // Storage failed — save the data URI directly to RTDB as fallback
-          // This ensures the photo ALWAYS persists even without Storage
-          nextProfile.photoURL = updatedFields.photo;
-        }
+        const file = await dataUriToFile(updatedFields.photo, `avatar-${uid}.jpg`);
+        const uploaded = await uploadImage(file, { kind: 'avatar' });
+        nextProfile.photo = uploaded.url;
+        nextProfile.photoURL = uploaded.url;
       } else {
-        // Already a URL (pasted link, Unsplash, etc.) — save directly
+        // Already a stable URL (an existing asset, or a pasted link).
         nextProfile.photoURL = updatedFields.photo;
+        nextProfile.photo = updatedFields.photo;
       }
     }
 
@@ -212,13 +220,25 @@ export function UserProfileProvider({ children }) {
 
     // Persist to backend API (authoritative source of truth)
     if (uid) {
+      // The API whitelists these; sending the whole profile object just meant
+      // most of it was silently discarded on every save.
+      const PERSISTED_FIELDS = [
+        'displayName', 'firstName', 'lastName', 'phone', 'address', 'dateOfBirth',
+        'gender', 'jobTitle', 'businessName', 'country', 'city', 'preferredLanguage',
+        'timezone', 'dateFormat', 'timeFormat', 'currency', 'theme', 'accentColor',
+        'language', 'emailNotifications', 'browserNotifications',
+      ];
       const apiPayload = {};
-      Object.entries(nextProfile).forEach(([key, val]) => {
-        if (val !== undefined && val !== null && key !== 'sessions') {
-          apiPayload[key] = val;
+      PERSISTED_FIELDS.forEach((key) => {
+        if (nextProfile[key] !== undefined && nextProfile[key] !== null) {
+          apiPayload[key] = nextProfile[key];
         }
       });
-      apiPayload.photoURL = nextProfile.photo || nextProfile.photoURL;
+
+      const resolvedPhoto = nextProfile.photo || nextProfile.photoURL;
+      if (resolvedPhoto && !resolvedPhoto.startsWith('data:')) {
+        apiPayload.photoURL = resolvedPhoto;
+      }
 
       const saved = await authAPI.updateProfile(apiPayload);
       if (saved?.user) {
@@ -228,8 +248,6 @@ export function UserProfileProvider({ children }) {
       // Update per-user localStorage cache
       const cacheKey = getLocalCacheKey(uid);
       localStorage.setItem(cacheKey, JSON.stringify(nextProfile));
-    } else {
-      localStorage.setItem('gurey_user_profile', JSON.stringify(nextProfile));
     }
 
     if (updatedFields.theme) {

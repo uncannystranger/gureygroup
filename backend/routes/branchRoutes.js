@@ -4,10 +4,11 @@ import Membership from '../models/Membership.js';
 import Audit from '../models/Audit.js';
 import Product from '../models/Product.js';
 import Sale from '../models/Sale.js';
-import { enforceTenantIsolation, requirePermission } from '../middleware/auth.js';
+import { enforceTenantIsolation, requirePermission, requireVerifiedEmail } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(enforceTenantIsolation);
+router.use(requireVerifiedEmail);
 
 /**
  * GET /api/branches

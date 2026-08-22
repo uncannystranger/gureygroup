@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Monitor, Wifi, WifiOff, Clock, Globe, Smartphone, Laptop, History } from 'lucide-react';
+import { Monitor, Wifi, WifiOff, Clock, Globe, Smartphone, Laptop, History, RefreshCw } from 'lucide-react';
 import { sessionAPI } from '../../services/apiService';
+import StatCard from '../../shared/ui/StatCard';
+import { EmptyState, SkeletonRows } from '../../shared/ui/States';
 
 export default function SessionsScreen() {
   const [activeSessions, setActiveSessions] = useState([]);
@@ -44,27 +46,25 @@ export default function SessionsScreen() {
 
   return (
     <div className="space-y-6 pb-12 page-enter">
-      <div>
-        <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Session Monitoring</h2>
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Track active login sessions and session history</p>
+      <div className="ds-page-header">
+        <div className="min-w-0">
+          <h2 className="ds-title">Session monitoring</h2>
+          <p className="ds-caption mt-0.5">Every device currently signed in to this workspace, and the history behind it.</p>
+        </div>
+        <div className="ds-page-header__actions">
+          <button type="button" onClick={loadSessions} className="ds-btn ds-btn-secondary ds-btn-sm" disabled={loading}>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+            Refresh
+          </button>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="glass-panel rounded-3xl p-4">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-2">
-            <Wifi className="w-4 h-4 text-emerald-400" />
-          </div>
-          <span className="text-2xl font-black text-slate-900 dark:text-white">{activeSessions.length}</span>
-          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Online Now</span>
-        </div>
-        <div className="glass-panel rounded-3xl p-4">
-          <div className="w-8 h-8 rounded-xl bg-slate-500/10 flex items-center justify-center mb-2">
-            <History className="w-4 h-4 text-slate-400" />
-          </div>
-          <span className="text-2xl font-black text-slate-900 dark:text-white">{historySessions.length}</span>
-          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Total Sessions</span>
-        </div>
+      {/* Two counts do not need two oversized cards; a compact row reads faster */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <StatCard index={0} label="Online now" value={activeSessions.length} icon={Wifi} tone={activeSessions.length ? 'positive' : 'neutral'} support="Active in the last 5 minutes" />
+        <StatCard index={1} label="Recorded sessions" value={historySessions.length} icon={History} support="Most recent 50" />
+        <StatCard index={2} label="Devices" value={new Set(activeSessions.map(s => `${s.device}-${s.browser}`)).size} icon={Monitor} support="Distinct device signatures" />
+        <StatCard index={3} label="People online" value={new Set(activeSessions.map(s => s.userId)).size} icon={Globe} support="Unique signed-in members" />
       </div>
 
       {/* Tabs */}
@@ -85,17 +85,15 @@ export default function SessionsScreen() {
       {/* Session list */}
       <div className="glass-panel rounded-4xl p-6">
         {loading ? (
-          <div className="flex items-center justify-center py-12"><div className="w-6 h-6 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" /></div>
+          <SkeletonRows count={4} />
         ) : (
           <div className="space-y-3">
             {(activeTab === 'active' ? activeSessions : historySessions).length === 0 ? (
-              <div className="text-center py-12">
-                <Monitor className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  {activeTab === 'active' ? 'No active sessions' : 'No session history'}
-                </h4>
-                <p className="text-xs text-slate-400">Session data will appear here as users log in</p>
-              </div>
+              <EmptyState
+                icon={Monitor}
+                title={activeTab === 'active' ? 'Nobody is signed in right now' : 'No session history yet'}
+                description="Sessions appear here as members of this workspace sign in, and are marked offline five minutes after their last activity."
+              />
             ) : (
               (activeTab === 'active' ? activeSessions : historySessions).map((session) => {
                 const DeviceIcon = getDeviceIcon(session.device);

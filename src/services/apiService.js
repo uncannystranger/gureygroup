@@ -81,6 +81,21 @@ async function apiFetch(endpoint, options = {}) {
       const apiError = new Error(data.message || data.error || `API error: ${response.status} ${response.statusText}`);
       apiError.status = response.status;
       apiError.code = data.code;
+      apiError.userFacing = Boolean(data.error);
+      // Verification outcomes are reported in `status` so the landing page can
+      // distinguish expired / used / superseded from a malformed link.
+      if (data.status) apiError.verificationStatus = data.status;
+      if (data.email) apiError.email = data.email;
+
+      // The server refuses business data until the address is confirmed. Tell
+      // the app so it can route to the verification screen instead of showing
+      // a dead end.
+      if (response.status === 403 && data.code === 'EMAIL_NOT_VERIFIED') {
+        apiError.requiresEmailVerification = true;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('gurey:email-unverified', { detail: { email: data.email } }));
+        }
+      }
       throw apiError;
     }
 
@@ -94,6 +109,47 @@ async function apiFetch(endpoint, options = {}) {
     throw err;
   }
 }
+
+/**
+ * Multipart upload. Content-Type is deliberately omitted so the browser sets
+ * it along with the multipart boundary.
+ */
+async function apiUpload(endpoint, file, fields = {}) {
+  const form = new FormData();
+  form.append('file', file);
+  Object.entries(fields).forEach(([key, value]) => form.append(key, value));
+
+  const headers = getHeaders();
+  delete headers['Content-Type'];
+
+  const response = await fetch(`${API_BASE}${endpoint}`, { method: 'POST', headers, body: form });
+  let data;
+  try { data = await response.json(); } catch { data = {}; }
+
+  if (!response.ok) {
+    const error = new Error(data.error || data.message || 'The image could not be uploaded.');
+    error.status = response.status;
+    error.code = data.code;
+    // These messages are written for people, so screens can show them as-is.
+    error.userFacing = Boolean(data.error);
+    throw error;
+  }
+  return data;
+}
+
+export const uploadAPI = {
+  limits: () => apiFetch('/uploads/limits'),
+  upload: (file, kind = 'product') => apiUpload('/uploads', file, { kind }),
+};
+
+export const verificationAPI = {
+  status: () => apiFetch('/auth/verification/status'),
+  request: () => apiFetch('/auth/verification/request', { method: 'POST', body: JSON.stringify({}) }),
+  confirm: (token) => apiFetch('/auth/verification/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  }),
+};
 
 export const authAPI = {
   employeeLogin: (data) => apiFetch('/team/auth/employee-login', {
@@ -161,6 +217,30 @@ export const teamAPI = {
 
   revokeInvitation: (id) => apiFetch(`/team/invitations/${id}`, { method: 'DELETE' }),
   regenerateInvitationCode: (id) => apiFetch(`/team/invitations/${id}/regenerate-code`, { method: 'POST' }),
+};
+
+export const inventoryAPI = {
+  listStockAdjustments: (branchId, options = {}) => {
+    const params = new URLSearchParams();
+    if (branchId) params.set('branchId', branchId);
+    if (options.productId) params.set('productId', options.productId);
+    if (options.limit) params.set('limit', options.limit);
+    return apiFetch(`/inventory/stock-adjustments?${params}`);
+  },
+  createStockAdjustment: (data) => apiFetch('/inventory/stock-adjustments', {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+  listSuppliers: () => apiFetch('/inventory/suppliers'),
+  createSupplier: (data) => apiFetch('/inventory/suppliers', { method: 'POST', body: JSON.stringify(data) }),
+  updateSupplier: (id, updates) => apiFetch(`/inventory/suppliers/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
+  listPurchaseOrders: () => apiFetch('/inventory/purchase-orders'),
+  createPurchaseOrder: (data) => apiFetch('/inventory/purchase-orders', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+export const customerAPI = {
+  list: () => apiFetch('/customers'),
+  create: (data) => apiFetch('/customers', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, updates) => apiFetch(`/customers/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
 };
 
 export const productAPI = {
@@ -331,7 +411,11 @@ export const sessionAPI = {
 
 export default {
   auth: authAPI,
+  upload: uploadAPI,
+  verification: verificationAPI,
   product: productAPI,
+  customer: customerAPI,
+  inventory: inventoryAPI,
   ai: aiAPI,
   sale: saleAPI,
   organization: organizationAPI,

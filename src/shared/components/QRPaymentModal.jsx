@@ -9,18 +9,13 @@ import { X, Smartphone, Copy, CheckCircle2, Phone, AlertCircle, Wifi } from 'luc
  * When scanned on a supported device, attempts to launch the phone dialer.
  * Falls back to displaying the USSD code manually.
  *
- * The merchantNumber is configurable per-company via localStorage ('gurey_merchant_number').
- * Default: 615283292
+ * The merchant number is workspace configuration held on the organization
+ * record, so it is the same on every device and survives a cache clear.
  */
 export default function QRPaymentModal({ total, onClose }) {
   const [copied, setCopied] = useState(false);
-  const [merchantNumber, setMerchantNumber] = useState(() => {
-    try {
-      return localStorage.getItem('gurey_merchant_number') || '615283292';
-    } catch {
-      return '615283292';
-    }
-  });
+  const { activeCompany } = useMultiTenant();
+  const merchantNumber = activeCompany?.merchantNumber || '';
 
   const roundedTotal = Math.ceil(total); // round up to whole number for USSD
   const ussdString = `*712*${merchantNumber}*${roundedTotal}#`;

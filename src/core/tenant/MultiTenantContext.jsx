@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { branchAPI, productAPI, saleAPI } from '../../services/apiService';
+import { branchAPI, productAPI, saleAPI, customerAPI, teamAPI, inventoryAPI } from '../../services/apiService';
 
 const MultiTenantContext = createContext();
 
@@ -31,7 +31,25 @@ export function MultiTenantProvider({ children }) {
 
   const [branches, setBranches] = useState([]);
 
+  /**
+   * Load status for the branch-scoped collections. Screens need to tell
+   * "still loading", "loaded and genuinely empty" and "the request failed"
+   * apart — an empty array alone cannot express that.
+   */
+  const [dataStatus, setDataStatus] = useState({
+    branches: 'idle',
+    products: 'idle',
+    sales: 'idle',
+  });
+  const [dataError, setDataError] = useState({ branches: null, products: null, sales: null });
+
+  const markStatus = (key, status, error = null) => {
+    setDataStatus((prev) => (prev[key] === status ? prev : { ...prev, [key]: status }));
+    setDataError((prev) => (prev[key] === error ? prev : { ...prev, [key]: error }));
+  };
+
   const [activeBranchId, setActiveBranchIdState] = useState(() => localStorage.getItem('gurey_active_branch_id') || '');
+  const [dataRefreshToken, setDataRefreshToken] = useState(0);
   const [warehouses, setWarehouses] = useState([]);
 
   // Isolated Collections - Default to EMPTY arrays for production user isolation
@@ -39,44 +57,19 @@ export function MultiTenantProvider({ children }) {
 
   const [sales, setSales] = useState([]);
 
-  const [purchaseOrders, setPurchaseOrders] = useState(() => {
-    const saved = localStorage.getItem(`gurey_purchase_orders_${activeCompanyId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
 
-  const [suppliers, setSuppliers] = useState(() => {
-    const saved = localStorage.getItem(`gurey_suppliers_${activeCompanyId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [suppliers, setSuppliers] = useState([]);
 
-  const [customers, setCustomers] = useState(() => {
-    const saved = localStorage.getItem(`gurey_customers_${activeCompanyId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Customers are workspace data, not device data — they come from the API.
+  const [customers, setCustomers] = useState([]);
 
-  const [employees, setEmployees] = useState(() => {
-    const saved = localStorage.getItem(`gurey_employees_${activeCompanyId}`);
-    return saved ? JSON.parse(saved) : (currentUser ? [{
-      id: currentUser.uid,
-      companyId: activeCompanyId,
-      name: currentUser.displayName || 'Owner',
-      role: 'Owner',
-      email: currentUser.email,
-      phone: 'N/A',
-      avatar: currentUser.photoURL,
-      badge: 'Owner'
-    }] : []);
-  });
+  const [employees, setEmployees] = useState([]);
 
-  const [activities, setActivities] = useState(() => {
-    const saved = localStorage.getItem(`gurey_activities_${activeCompanyId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Activity history is the server-side audit log; nothing is kept here.
+  const [activities, setActivities] = useState([]);
 
-  const [stockAdjustments, setStockAdjustments] = useState(() => {
-    const saved = localStorage.getItem(`gurey_stock_adjustments_${activeCompanyId}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [stockAdjustments, setStockAdjustments] = useState([]);
 
   const [notifications, setNotifications] = useState(() => {
     const saved = localStorage.getItem(`gurey_notifications_${activeCompanyId}`);
@@ -107,6 +100,7 @@ export function MultiTenantProvider({ children }) {
   });
 
   const refreshBranches = async () => {
+    markStatus('branches', 'loading');
     const data = await branchAPI.list();
     const nextBranches = (data.branches || []).map(normalizeBranch);
     setBranches(nextBranches);
@@ -115,6 +109,7 @@ export function MultiTenantProvider({ children }) {
       const preferred = nextBranches.find((branch) => branch.id === current || branch.id === saved);
       return preferred?.id || nextBranches.find((branch) => branch.isActive)?.id || '';
     });
+    markStatus('branches', 'ready');
     return nextBranches;
   };
 
@@ -128,14 +123,113 @@ export function MultiTenantProvider({ children }) {
     }
 
     if (activeCompanyId) {
+      loadCustomers();
+      loadEmployees();
+      loadSuppliers();
+      loadPurchaseOrders();
       refreshBranches()
         .catch((err) => {
           console.warn('[MultiTenant] Failed to load branches from backend:', err);
           setBranches([]);
+          markStatus('branches', 'error', err.message || 'Unable to load branches.');
         });
 
     }
   }, [activeCompanyId, currentUser?.uid]);
+
+  const loadProducts = (branchId) => {
+    markStatus('products', 'loading');
+    return productAPI.list(branchId)
+      .then((data) => {
+        setProducts((Array.isArray(data) ? data : []).map(normalizeProduct));
+        markStatus('products', 'ready');
+      })
+      .catch((err) => {
+        console.warn('[MultiTenant] Failed to load products from backend:', err);
+        setProducts([]);
+        markStatus('products', 'error', err.message || 'Unable to load the product catalog.');
+      });
+  };
+
+  const loadSales = (branchId) => {
+    markStatus('sales', 'loading');
+    return saleAPI.list({ branchId, limit: 250 })
+      .then((data) => {
+        setSales((data.sales || []).map((sale) => ({
+          ...sale,
+          id: sale._id || sale.id,
+          total: sale.totalAmount ?? sale.total ?? 0,
+          date: sale.createdAt,
+          formattedDate: sale.createdAt ? new Date(sale.createdAt).toLocaleString() : '',
+        })));
+        markStatus('sales', 'ready');
+      })
+      .catch((err) => {
+        console.warn('[MultiTenant] Failed to load sales from backend:', err);
+        setSales([]);
+        markStatus('sales', 'error', err.message || 'Unable to load sales.');
+      });
+  };
+
+  const normalizeCustomer = (customer) => ({
+    ...customer,
+    id: customer._id || customer.id,
+    companyId: customer.companyId,
+  });
+
+  const loadCustomers = () => customerAPI.list()
+    .then((data) => setCustomers((data.customers || []).map(normalizeCustomer)))
+    .catch((err) => {
+      console.warn('[MultiTenant] Failed to load customers:', err.message);
+      setCustomers([]);
+    });
+
+  /**
+   * The roster powers the POS cashier selector. Only roles that may view the
+   * team can read it; everyone else works as themselves.
+   */
+  const loadEmployees = () => teamAPI.getMembers()
+    .then((data) => setEmployees((data.members || []).map((m) => ({
+      id: m.userId,
+      companyId: m.companyId,
+      name: m.displayName,
+      email: m.email,
+      role: m.role,
+      avatar: m.photoURL,
+      badge: m.role,
+      status: m.status,
+    }))))
+    .catch(() => {
+      setEmployees(currentUser ? [{
+        id: currentUser.uid,
+        companyId: activeCompanyId,
+        name: currentUser.displayName || currentUser.email,
+        email: currentUser.email,
+        role: currentUser.role || 'Employee',
+        avatar: currentUser.photoURL,
+        badge: currentUser.role || 'Employee',
+      }] : []);
+    });
+
+  const loadSuppliers = () => inventoryAPI.listSuppliers()
+    .then((data) => setSuppliers((data.suppliers || []).map((x) => ({ ...x, id: x._id }))))
+    .catch((err) => { console.warn('[MultiTenant] Failed to load suppliers:', err.message); setSuppliers([]); });
+
+  const loadPurchaseOrders = () => inventoryAPI.listPurchaseOrders()
+    .then((data) => setPurchaseOrders((data.purchaseOrders || []).map((x) => ({ ...x, id: x._id }))))
+    .catch((err) => { console.warn('[MultiTenant] Failed to load purchase orders:', err.message); setPurchaseOrders([]); });
+
+  const loadStockAdjustments = (branchId) => inventoryAPI.listStockAdjustments(branchId, { limit: 200 })
+    .then((data) => setStockAdjustments((data.adjustments || []).map((x) => ({
+      ...x,
+      id: x._id,
+      timestamp: x.createdAt,
+      user: x.userName,
+    }))))
+    .catch((err) => { console.warn('[MultiTenant] Failed to load stock history:', err.message); setStockAdjustments([]); });
+
+  /** Bumped to re-run the branch-scoped loaders (used by "Retry" affordances). */
+  const refreshWorkspaceData = () => setDataRefreshToken((token) => token + 1);
 
   // The selected branch is the data boundary for every branch-aware view.
   useEffect(() => {
@@ -143,26 +237,11 @@ export function MultiTenantProvider({ children }) {
     localStorage.setItem('gurey_active_branch_id', activeBranchId);
     localStorage.setItem(`gurey_active_branch_${activeCompanyId}`, activeBranchId);
 
-    productAPI.list(activeBranchId)
-      .then((data) => setProducts((Array.isArray(data) ? data : []).map(normalizeProduct)))
-      .catch((err) => {
-        console.warn('[MultiTenant] Failed to load products from backend:', err);
-        setProducts([]);
-      });
-
-    saleAPI.list({ branchId: activeBranchId, limit: 250 })
-        .then((data) => setSales((data.sales || []).map((sale) => ({
-          ...sale,
-          id: sale._id || sale.id,
-          total: sale.totalAmount ?? sale.total ?? 0,
-          date: sale.createdAt,
-          formattedDate: sale.createdAt ? new Date(sale.createdAt).toLocaleString() : '',
-        }))))
-        .catch((err) => {
-          console.warn('[MultiTenant] Failed to load sales from backend:', err);
-          setSales([]);
-      });
-  }, [activeCompanyId, activeBranchId, currentUser?.uid]);
+    loadProducts(activeBranchId);
+    loadSales(activeBranchId);
+    loadStockAdjustments(activeBranchId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCompanyId, activeBranchId, currentUser?.uid, dataRefreshToken]);
 
   const setActiveBranchId = (branchId) => {
     if (!branches.some((branch) => branch.id === branchId && branch.isActive)) return;
@@ -172,17 +251,17 @@ export function MultiTenantProvider({ children }) {
   // Persist UI-only state that does not have backend routes yet.
   useEffect(() => {
     if (!activeCompanyId) return;
-    localStorage.setItem(`gurey_purchase_orders_${activeCompanyId}`, JSON.stringify(purchaseOrders));
-    localStorage.setItem(`gurey_suppliers_${activeCompanyId}`, JSON.stringify(suppliers));
-    localStorage.setItem(`gurey_customers_${activeCompanyId}`, JSON.stringify(customers));
-    localStorage.setItem(`gurey_employees_${activeCompanyId}`, JSON.stringify(employees));
-    localStorage.setItem(`gurey_activities_${activeCompanyId}`, JSON.stringify(activities));
-    localStorage.setItem(`gurey_stock_adjustments_${activeCompanyId}`, JSON.stringify(stockAdjustments));
     localStorage.setItem(`gurey_notifications_${activeCompanyId}`, JSON.stringify(notifications));
     localStorage.setItem(`gurey_held_carts_${activeCompanyId}`, JSON.stringify(heldCarts));
-  }, [activeCompanyId, purchaseOrders, suppliers, customers, employees, activities, stockAdjustments, notifications, heldCarts]);
+  }, [activeCompanyId, notifications, heldCarts]);
 
-  const activeCompany = companies.find(c => c.id === activeCompanyId) || (tenantCompany || companies[0]);
+  // The authenticated workspace is the source of truth. The cached `companies`
+  // list only fills gaps — otherwise a stale localStorage entry (with its
+  // placeholder 8.5% tax rate) silently overrode the real organization settings.
+  const cachedCompany = companies.find(c => c.id === activeCompanyId) || companies[0];
+  const activeCompany = (tenantCompany || cachedCompany)
+    ? { ...(cachedCompany || {}), ...(tenantCompany || {}) }
+    : null;
   const activeBranch = branches.find(b => b.id === activeBranchId) || branches[0];
 
   // Scoped Data getters
@@ -333,10 +412,10 @@ export function MultiTenantProvider({ children }) {
       .filter(p => productIds.includes(p.id))
       .map(async (p) => {
         const newQty = Math.max(0, p.quantity + deltaQty);
-        logStockAdjustment(p.id, p.name, p.sku, deltaQty, reason);
-        return normalizeProduct(await productAPI.update(p.id, { stock: newQty }));
+        return normalizeProduct(await productAPI.update(p.id, { stock: newQty, adjustmentReason: reason }));
       }));
     setProducts(prev => prev.map(p => updates.find(u => u.id === p.id) || p));
+    await refreshStockAdjustments();
     logActivity(`Bulk stock adjustment on ${productIds.length} products (${deltaQty > 0 ? '+' : ''}${deltaQty})`);
     addNotification('Bulk Stock Adjusted', `Adjusted stock for ${productIds.length} items.`, 'info');
   };
@@ -357,19 +436,22 @@ export function MultiTenantProvider({ children }) {
   };
 
   // Log Stock Adjustment Audit
-  const logStockAdjustment = (productId, productName, sku, delta, reason) => {
-    const adjustment = {
-      id: `adj_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      companyId: activeCompanyId,
-      productId,
-      productName,
-      sku,
-      delta,
-      reason,
-      timestamp: new Date().toISOString(),
-      user: currentUser?.displayName || 'Active User'
-    };
-    setStockAdjustments(prev => [adjustment, ...prev]);
+  /**
+   * Stock movements are recorded by the API in the same transaction as the
+   * stock change itself, so the client cannot invent ledger entries — it only
+   * re-reads what the server wrote.
+   */
+  const refreshStockAdjustments = () => loadStockAdjustments(activeBranchId);
+
+  /** Explicit intake / write-off. */
+  const adjustStock = async ({ productId, delta, reason }) => {
+    const { product } = await inventoryAPI.createStockAdjustment({
+      productId, delta, reason, branchId: activeBranchId,
+    });
+    const normalized = normalizeProduct(product);
+    setProducts(prev => prev.map(p => (p.id === normalized.id ? normalized : p)));
+    await refreshStockAdjustments();
+    return normalized;
   };
 
   // Add Sale Workflow
@@ -411,7 +493,6 @@ export function MultiTenantProvider({ children }) {
               addNotification('Low Stock Warning', `${p.name} quantity (${newQty}) reached alert threshold!`, 'warning');
             }
 
-            logStockAdjustment(p.id, p.name, p.sku, -itemInSale.quantity, 'POS Sale');
             return {
               ...p,
               quantity: newQty,
@@ -423,22 +504,11 @@ export function MultiTenantProvider({ children }) {
       });
     }
 
-    // Update customer loyalty points
-    if (saleData.customerName && saleData.customerName !== 'Walk-in Customer') {
-      const earnedPoints = Math.floor(saleData.total);
-      setCustomers(prev => prev.map(c => {
-        if (c.name.toLowerCase() === saleData.customerName.toLowerCase()) {
-          const prevPoints = c.loyaltyPoints || 0;
-          const currentSpentNum = parseFloat((c.totalSpent || '$0').replace(/[^0-9.]/g, '')) || 0;
-          return {
-            ...c,
-            loyaltyPoints: prevPoints + earnedPoints,
-            totalSpent: `$${(currentSpentNum + saleData.total).toFixed(2)}`,
-            lastPurchase: 'Today'
-          };
-        }
-        return c;
-      }));
+    // Loyalty totals are recalculated by the API as part of the sale
+    // transaction; re-read them rather than keeping a local guess that would
+    // drift from the recorded revenue.
+    if (saleData.customerId) {
+      loadCustomers();
     }
 
     logActivity(`Completed Sale ${newSale.receiptNumber} ($${newSale.total.toFixed(2)}) via ${newSale.paymentMethod}`);
@@ -461,7 +531,6 @@ export function MultiTenantProvider({ children }) {
           const newQty = p.quantity + qtyToAdd;
           totalRefundAmount += (returnedItem.price * qtyToAdd);
           
-          logStockAdjustment(p.id, p.name, p.sku, qtyToAdd, `Return / Refund: ${reason}`);
           return {
             ...p,
             quantity: newQty,
@@ -518,23 +587,13 @@ export function MultiTenantProvider({ children }) {
   };
 
   // Add Customer Quick Action
-  const addCustomer = (customerData) => {
-    const newCust = {
-      id: `cust_${Date.now()}`,
-      companyId: activeCompanyId,
-      name: customerData.name,
-      phone: customerData.phone || 'N/A',
-      email: customerData.email || 'N/A',
-      group: customerData.group || 'Regular Retail',
-      loyaltyPoints: 0,
-      totalSpent: '$0.00',
-      outstandingBalance: '$0.00',
-      lastPurchase: 'Never'
-    };
-    setCustomers(prev => [newCust, ...prev]);
-    logActivity(`Registered New Customer: ${newCust.name}`);
-    addNotification('Customer Created', `${newCust.name} added to customer ledger.`, 'success');
-    return newCust;
+  const addCustomer = async (customerData) => {
+    const { customer } = await customerAPI.create(customerData);
+    const normalized = normalizeCustomer(customer);
+    setCustomers(prev => [normalized, ...prev]);
+    logActivity(`Added Customer: ${normalized.name}`);
+    addNotification('Customer Added', `${normalized.name} was saved to your customer list.`, 'success');
+    return normalized;
   };
 
   // Create Company
@@ -573,11 +632,17 @@ export function MultiTenantProvider({ children }) {
     logActivity(`Created new business workspace: ${newCompany.name}`);
   };
 
+  /**
+   * Activity history is written server-side to the audit log as a side effect
+   * of the mutation itself. Keeping a parallel client-side list produced a
+   * second, unverifiable history, so this only tracks the current session for
+   * immediate feedback.
+   */
   const logActivity = (text) => {
     setActivities(prev => [
       { id: `act_${Date.now()}`, time: 'Just now', user: currentUser?.displayName || 'Active User', text },
-      ...prev
-    ]);
+      ...prev,
+    ].slice(0, 50));
   };
 
   return (
@@ -590,6 +655,9 @@ export function MultiTenantProvider({ children }) {
       activeBranchId,
       setActiveBranchId,
       refreshBranches,
+      refreshWorkspaceData,
+      dataStatus,
+      dataError,
       warehouses,
       products: companyProducts,
       allProducts: products,
@@ -614,7 +682,8 @@ export function MultiTenantProvider({ children }) {
       bulkStockUpdate,
       bulkCategoryAssign,
       bulkArchiveProducts,
-      logStockAdjustment,
+      adjustStock,
+      refreshStockAdjustments,
       addSale,
       processRefund,
       holdCart,

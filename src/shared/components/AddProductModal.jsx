@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, Trash2, Star, ArrowLeft, ArrowRight, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
 import { useMultiTenant } from '../../core/tenant/MultiTenantContext';
 import { useLanguage } from '../../localization/LanguageContext';
 import Modal from './Modal';
+import { uploadImage, getUploadLimits, formatBytes, DEFAULT_LIMITS } from '../lib/imageUpload';
 
 export default function AddProductModal({ isOpen, onClose }) {
   const { addProduct, products } = useMultiTenant();
@@ -32,24 +33,57 @@ export default function AddProductModal({ isOpen, onClose }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState(null);
+  // Mirrors the server's limits so the hints and the checks agree with it.
+  const [limits, setLimits] = useState(DEFAULT_LIMITS);
 
-  // Image Upload Handlers
-  const handleFiles = (files) => {
+  useEffect(() => {
+    let active = true;
+    getUploadLimits().then((next) => { if (active) setLimits(next); });
+    return () => { active = false; };
+  }, []);
+
+  /**
+   * Images are uploaded as they are chosen and the product only ever carries
+   * the returned URLs. Previously each file was inlined as a base64 data URI
+   * into the product JSON, which is what produced "request entity too large".
+   */
+  const handleFiles = async (files) => {
+    setError(null);
     const fileList = Array.from(files);
-    fileList.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImages(prev => {
-          const isFirst = prev.length === 0;
-          return [...prev, {
-            id: `img_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-            url: e.target.result,
-            isPrimary: isFirst
-          }];
-        });
-      };
-      reader.readAsDataURL(file);
-    });
+    const limits = await getUploadLimits();
+
+    const room = limits.maxFilesPerProduct - images.length;
+    if (room <= 0) {
+      setError(`You can attach up to ${limits.maxFilesPerProduct} images to a product.`);
+      return;
+    }
+    if (fileList.length > room) {
+      setError(`Only the first ${room} image${room === 1 ? '' : 's'} were added — the limit is ${limits.maxFilesPerProduct} per product.`);
+    }
+
+    for (const file of fileList.slice(0, room)) {
+      const localId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      // Show the file immediately with a local preview while it uploads.
+      const previewUrl = URL.createObjectURL(file);
+      setImages(prev => [...prev, {
+        id: localId,
+        url: previewUrl,
+        previewUrl,
+        isPrimary: prev.length === 0,
+        status: 'uploading',
+      }]);
+
+      try {
+        const uploaded = await uploadImage(file, { kind: 'product' });
+        setImages(prev => prev.map(img => img.id === localId
+          ? { ...img, url: uploaded.url, uploadedSize: uploaded.size, status: 'ready' }
+          : img));
+      } catch (err) {
+        setImages(prev => prev.filter(img => img.id !== localId));
+        URL.revokeObjectURL(previewUrl);
+        setError(err.userFacing ? err.message : 'That image could not be uploaded. Please try another.');
+      }
+    }
   };
 
   const handleDrop = (e) => {
@@ -108,9 +142,16 @@ export default function AddProductModal({ isOpen, onClose }) {
       return;
     }
 
+    if (images.some(img => img.status === 'uploading')) {
+      setError('Please wait for the images to finish uploading.');
+      return;
+    }
+
+    // Only persisted references travel with the product record.
+    const stored = images.filter(img => img.status !== 'uploading');
     const orderedImages = [
-      ...images.filter(img => img.isPrimary).map(img => img.url),
-      ...images.filter(img => !img.isPrimary).map(img => img.url)
+      ...stored.filter(img => img.isPrimary).map(img => img.url),
+      ...stored.filter(img => !img.isPrimary).map(img => img.url)
     ];
 
     try {
@@ -200,7 +241,10 @@ export default function AddProductModal({ isOpen, onClose }) {
                     />
                   </label>
                 </p>
-                <p className="text-[10px] text-slate-400 mt-1">Supports PNG, JPG, WEBP • Multiple Image Upload</p>
+                <p className="ds-caption text-[10px] mt-1">
+                  JPEG, PNG, WebP or GIF · up to {formatBytes(limits.maxFileBytes)} each · {limits.maxFilesPerProduct} max
+                </p>
+                <p className="ds-caption text-[10px] mt-0.5">Large photos are resized in your browser before upload.</p>
               </div>
 
               {/* Image URL Paste Fallback */}
@@ -226,7 +270,12 @@ export default function AddProductModal({ isOpen, onClose }) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                   {images.map((img, index) => (
                     <div key={img.id} className="relative group rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-900 aspect-square animate-fade-in-up">
-                      <img src={img.url} alt="Preview" className="w-full h-full object-cover" />
+                      <img src={img.previewUrl || img.url} alt="Preview" className="w-full h-full object-cover" />
+                      {img.status === 'uploading' && (
+                        <span className="absolute inset-0 grid place-items-center bg-slate-950/55" role="status">
+                          <span className="ds-progress-line w-12" aria-label="Uploading image" />
+                        </span>
+                      )}
                       
                       {/* Primary Thumbnail Badge */}
                       {img.isPrimary ? (

@@ -12,8 +12,8 @@ import {
   updateEmail,
   onAuthStateChanged
 } from './firebase';
-import { loadUserProfile, getLocalCacheKey } from '../user/userProfileService';
-import { authAPI, sessionAPI, teamAPI } from '../../services/apiService';
+import { getLocalCacheKey } from '../user/userProfileService';
+import { authAPI, sessionAPI, teamAPI, verificationAPI } from '../../services/apiService';
 
 const AuthContext = createContext();
 
@@ -36,6 +36,10 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+  // Mirrors the server's record. The frontend never decides this on its own —
+  // the API refuses business data until the server agrees the address is
+  // confirmed, and this only reflects that decision for routing purposes.
+  const [emailVerification, setEmailVerification] = useState({ status: 'unknown', email: null, method: null });
 
   const normalizeBackendCompany = (company) => {
     if (!company) return null;
@@ -45,7 +49,15 @@ export function AuthProvider({ children }) {
       name: company.name || company.companyName || 'Organization',
       tier: company.subscriptionTier || company.tier || 'Production SaaS',
       currency: company.currency || 'USD ($)',
+      currencySymbol: company.currencySymbol || company.settings?.currencySymbol || '$',
       timezone: company.timezone || 'UTC',
+      // The API stores the tax rate under settings; the UI reads a flat
+      // `taxRate`, so without this mapping every screen fell back to a
+      // hardcoded rate and Reports rendered a bare "Tax Rate: %".
+      taxRate: Number(company.taxRate ?? company.settings?.defaultTaxRate ?? 0),
+      lowStockThreshold: Number(company.settings?.lowStockThreshold ?? 10),
+      merchantNumber: company.merchantNumber ?? company.settings?.merchantNumber ?? '',
+      receiptSettings: company.receiptSettings ?? company.settings?.receipt ?? {},
     };
   };
 
@@ -66,9 +78,12 @@ export function AuthProvider({ children }) {
   };
 
   const syncBackendAuth = async (fbUser) => {
+    // The backend derives identity from this token alone — it is the proof of
+    // who the caller is, so it must be fresh and must never be substituted by
+    // client-supplied uid/email fields.
+    const idToken = await fbUser.getIdToken(/* forceRefresh */ true);
     const synced = await authAPI.syncFirebaseUser({
-      firebaseUid: fbUser.uid,
-      email: fbUser.email,
+      idToken,
       displayName: fbUser.displayName || fbUser.email?.split('@')[0],
       photoURL: fbUser.photoURL || '',
     });
@@ -79,7 +94,9 @@ export function AuthProvider({ children }) {
       email: synced.user.email,
       displayName: synced.user.displayName || synced.user.email.split('@')[0],
       photoURL: synced.user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(synced.user.displayName || synced.user.email)}&background=6366F1&color=fff`,
-      emailVerified: fbUser.emailVerified || false,
+      // The server's record wins: Firebase's local flag says nothing about
+      // whether *this* application considers the address confirmed.
+      emailVerified: Boolean(synced.user.emailVerified),
       role: synced.user.role,
       permissions: synced.user.permissions || [],
       companyId: synced.user.companyId,
@@ -88,6 +105,11 @@ export function AuthProvider({ children }) {
 
     localStorage.setItem('gurey_auth_token', synced.token);
     localStorage.setItem('gurey_auth_user', JSON.stringify(userObj));
+    setEmailVerification({
+      status: synced.user.emailVerified ? 'verified' : 'unverified',
+      email: synced.user.email,
+      method: null,
+    });
     localStorage.setItem('gurey_tenant_company', JSON.stringify(companyObj));
     localStorage.setItem('gurey_active_company', companyObj.id);
 
@@ -108,30 +130,12 @@ export function AuthProvider({ children }) {
     return { user: userObj, company: companyObj };
   };
 
-  // Helper to persist account mapping
-  const validateUniqueRegistration = (email) => {
-    const existingAccountsRaw = localStorage.getItem('gurey_registered_accounts');
-    const registeredAccounts = existingAccountsRaw ? JSON.parse(existingAccountsRaw) : [];
-    const normalizedEmail = email.toLowerCase().trim();
-    return registeredAccounts.find(acc => acc.email.toLowerCase() === normalizedEmail);
-  };
-
-  const registerAccountWorkspace = (userData, companyData) => {
-    const existingAccountsRaw = localStorage.getItem('gurey_registered_accounts');
-    const registeredAccounts = existingAccountsRaw ? JSON.parse(existingAccountsRaw) : [];
-    
-    const updatedAccounts = [
-      ...registeredAccounts.filter(acc => acc.email.toLowerCase() !== userData.email.toLowerCase()),
-      {
-        email: userData.email.toLowerCase(),
-        uid: userData.uid,
-        companyId: companyData.id,
-        companyName: companyData.name,
-        registeredAt: new Date().toISOString()
-      }
-    ];
-    localStorage.setItem('gurey_registered_accounts', JSON.stringify(updatedAccounts));
-  };
+  /**
+   * The former localStorage "registered accounts" registry has been removed.
+   * Account existence, ownership and workspace binding are decided by the API
+   * from the verified identity — a client-held list could never be trusted and
+   * only risked contradicting the server.
+   */
 
   // Firebase Auth Observer for Session Persistence
   useEffect(() => {
@@ -155,20 +159,12 @@ export function AuthProvider({ children }) {
           }
 
           try {
+            // The API response already carries the stored photo URL; there is
+            // no second profile store to reconcile against any more.
             const { user, company } = await syncBackendAuth(fbUser);
-
-            let persistedPhotoURL = user.photoURL;
-            try {
-              const firestoreProfile = await loadUserProfile(fbUser.uid);
-              if (firestoreProfile?.photoURL) {
-                persistedPhotoURL = firestoreProfile.photoURL;
-              }
-            } catch { /* non-fatal */ }
-
-            const hydratedUser = { ...user, photoURL: persistedPhotoURL };
-            setCurrentUser(hydratedUser);
+            setCurrentUser(user);
             setTenantCompany(company);
-            localStorage.setItem('gurey_auth_user', JSON.stringify(hydratedUser));
+            localStorage.setItem('gurey_auth_user', JSON.stringify(user));
           } catch (err) {
             console.error('[Auth] Backend auth synchronization failed:', err);
             setCurrentUser(null);
@@ -194,13 +190,19 @@ export function AuthProvider({ children }) {
                 role: membership.role || storedUser.role,
                 permissions: membership.permissions || storedUser.permissions || [],
                 companyId: membership.companyId || storedUser.companyId,
-                emailVerified: true,
-                requiresEmailVerification: false,
+                // The server's record decides this — assuming `true` here let a
+                // restored session skip the gate entirely.
+                emailVerified: Boolean(backendUser.emailVerified),
                 authType: 'employee',
               };
               const company = normalizeBackendCompany(session.company);
               setCurrentUser(restoredUser);
               setTenantCompany(company);
+              setEmailVerification({
+                status: restoredUser.emailVerified ? 'verified' : 'unverified',
+                email: restoredUser.email,
+                method: null,
+              });
               localStorage.setItem('gurey_auth_user', JSON.stringify(restoredUser));
               localStorage.setItem('gurey_tenant_company', JSON.stringify(company));
               setAuthLoading(false);
@@ -230,14 +232,32 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // Sync state changes to LocalStorage
+  /**
+   * The API is the authority. If any request comes back with
+   * EMAIL_NOT_VERIFIED, drop the local session's verified flag so the app
+   * routes to the verification screen instead of rendering empty data.
+   */
   useEffect(() => {
+    const onUnverified = () => {
+      setCurrentUser(prev => (prev && prev.emailVerified ? { ...prev, emailVerified: false } : prev));
+      setEmailVerification(prev => ({ ...prev, status: 'unverified' }));
+    };
+    window.addEventListener('gurey:email-unverified', onUnverified);
+    return () => window.removeEventListener('gurey:email-unverified', onUnverified);
+  }, []);
+
+  // Sync state changes to LocalStorage.
+  // While auth is still resolving, `currentUser` is legitimately null — clearing
+  // storage here would erase the very session the observer is about to restore,
+  // logging employees out on every page refresh.
+  useEffect(() => {
+    if (authLoading) return;
     if (currentUser) {
       localStorage.setItem('gurey_auth_user', JSON.stringify(currentUser));
     } else {
       localStorage.removeItem('gurey_auth_user');
     }
-  }, [currentUser]);
+  }, [currentUser, authLoading]);
 
   // Periodic session heartbeat (every 60s when logged in)
   useEffect(() => {
@@ -252,12 +272,13 @@ export function AuthProvider({ children }) {
   }, [currentUser]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (tenantCompany) {
       localStorage.setItem('gurey_tenant_company', JSON.stringify(tenantCompany));
     } else {
       localStorage.removeItem('gurey_tenant_company');
     }
-  }, [tenantCompany]);
+  }, [tenantCompany, authLoading]);
 
   // 1. Google OAuth Sign-in
   const loginWithGoogle = async () => {
@@ -303,11 +324,6 @@ export function AuthProvider({ children }) {
         console.warn("Failed to reload user verification status:", e);
       }
 
-      const existingReg = validateUniqueRegistration(email);
-      if (!existingReg) {
-        console.warn('[Auth] Local account registry missing; using backend workspace sync as source of truth.');
-      }
-
       const { user, company } = await syncBackendAuth(fbUser);
       setCurrentUser(user);
       setTenantCompany(company);
@@ -339,7 +355,12 @@ export function AuthProvider({ children }) {
     try {
       const employeeResult = await authAPI.employeeLogin({ email, password });
       const company = normalizeBackendCompany(employeeResult.organization);
-      const user = { ...employeeResult.user, emailVerified: true, requiresEmailVerification: false, accountType: 'employee', authType: 'employee' };
+      const user = {
+        ...employeeResult.user,
+        emailVerified: Boolean(employeeResult.user?.emailVerified),
+        accountType: 'employee',
+        authType: 'employee',
+      };
       localStorage.setItem('gurey_auth_token', employeeResult.token);
       localStorage.setItem('gurey_auth_user', JSON.stringify(user));
       localStorage.setItem('gurey_tenant_company', JSON.stringify(company));
@@ -377,7 +398,6 @@ export function AuthProvider({ children }) {
       const { user, company } = await syncBackendAuth(fbUser);
 
       const companyObj = companyName ? { ...company, name: companyName } : company;
-      registerAccountWorkspace(user, companyObj);
 
       setCurrentUser(user);
       setTenantCompany(companyObj);
@@ -433,23 +453,39 @@ export function AuthProvider({ children }) {
     return false;
   };
 
-  // 7. Verify OTP Code (supports backend OTP verification if enabled)
-  const verifyOtpCode = async (otpCode) => {
-    setLoading(true);
+  // 7. Email verification — all state changes are decided by the server.
+  const refreshVerificationStatus = async () => {
     try {
-      if (!otpCode || otpCode.trim().length !== 6) {
-        throw new Error("Invalid 6-digit OTP verification code.");
-      }
-      if (auth.currentUser) {
-        await auth.currentUser.reload();
-      }
-      const updatedUser = { ...currentUser, emailVerified: true };
-      setCurrentUser(updatedUser);
-      localStorage.setItem('gurey_auth_user', JSON.stringify(updatedUser));
-      return true;
-    } finally {
-      setLoading(false);
+      const status = await verificationAPI.status();
+      setEmailVerification({
+        status: status.emailVerified ? 'verified' : 'unverified',
+        email: status.email,
+        method: status.method,
+      });
+      setCurrentUser(prev => prev ? { ...prev, emailVerified: Boolean(status.emailVerified) } : prev);
+      return status;
+    } catch (err) {
+      console.warn('[Auth] Could not read verification status:', err.message);
+      return null;
     }
+  };
+
+  const requestVerificationEmail = async () => {
+    const result = await verificationAPI.request();
+    if (result.alreadyVerified) {
+      await refreshVerificationStatus();
+    }
+    return result;
+  };
+
+  /** Exchanges a link token for a confirmed address. */
+  const confirmVerificationToken = async (token) => {
+    const result = await verificationAPI.confirm(token);
+    if (result.verified) {
+      setEmailVerification(prev => ({ ...prev, status: 'verified' }));
+      setCurrentUser(prev => prev ? { ...prev, emailVerified: true } : prev);
+    }
+    return result;
   };
 
   // 8. Password Reset
@@ -562,7 +598,7 @@ export function AuthProvider({ children }) {
       currentUser,
       tenantCompany,
       isAuthenticated: !!currentUser,
-      isEmailVerified: currentUser?.emailVerified || false,
+      isEmailVerified: Boolean(currentUser?.emailVerified),
       loading,
       authLoading,
       authError,
@@ -574,7 +610,10 @@ export function AuthProvider({ children }) {
       resendVerificationEmail,
       changeUserEmail,
       checkEmailVerificationStatus,
-      verifyOtpCode,
+      emailVerification,
+      refreshVerificationStatus,
+      requestVerificationEmail,
+      confirmVerificationToken,
       resetPassword,
       acceptInvitation,
       logout

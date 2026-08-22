@@ -8,6 +8,20 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      // Vendor code changes far less often than app code; splitting it keeps
+      // the large, stable dependencies in separately cacheable chunks.
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-firebase': ['firebase/app', 'firebase/auth'],
+            'vendor-icons': ['lucide-react'],
+          },
+        },
+      },
+      chunkSizeWarningLimit: 900,
+    },
     server: {
       port: 3000,
       open: false,

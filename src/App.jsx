@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { MultiTenantProvider } from './core/tenant/MultiTenantContext';
 import { BranchProvider } from './core/branch/BranchContext';
 import { ThemeProvider } from './core/theme/ThemeContext';
@@ -14,32 +14,47 @@ import AddProductModal from './shared/components/AddProductModal';
 import NotificationToast from './shared/components/NotificationToast';
 
 import DashboardScreen from './features/dashboard/DashboardScreen';
-import ProductsScreen from './features/products/ProductsScreen';
-import POSScreen from './features/sales/POSScreen';
-import ReportsScreen from './features/reports/ReportsScreen';
-import EmployeesScreen from './features/employees/EmployeesScreen';
-import SettingsScreen from './features/settings/SettingsScreen';
-import TeamManagementScreen from './features/team/TeamManagementScreen';
-import AttendanceScreen from './features/attendance/AttendanceScreen';
-import BranchManagementScreen from './features/branches/BranchManagementScreen';
-import AuditLogScreen from './features/audit/AuditLogScreen';
-import SessionsScreen from './features/audit/SessionsScreen';
-import OrganizationSettingsScreen from './features/settings/OrganizationSettingsScreen';
 import AuthScreen from './features/auth/AuthScreen';
-import AcceptInvitationScreen from './features/auth/AcceptInvitationScreen';
-import VerifyEmailScreen from './features/auth/VerifyEmailScreen';
-import AiAssistantWidget from './features/ai_assistant/AiAssistantWidget';
-import { Sparkles } from 'lucide-react';
+
+// Only the dashboard and the sign-in screen are needed for a first paint;
+// every other section is fetched the first time it is opened.
+const ProductsScreen = lazy(() => import('./features/products/ProductsScreen'));
+const POSScreen = lazy(() => import('./features/sales/POSScreen'));
+const ReportsScreen = lazy(() => import('./features/reports/ReportsScreen'));
+const SettingsScreen = lazy(() => import('./features/settings/SettingsScreen'));
+const TeamManagementScreen = lazy(() => import('./features/team/TeamManagementScreen'));
+const AttendanceScreen = lazy(() => import('./features/attendance/AttendanceScreen'));
+const BranchManagementScreen = lazy(() => import('./features/branches/BranchManagementScreen'));
+const AuditLogScreen = lazy(() => import('./features/audit/AuditLogScreen'));
+const SessionsScreen = lazy(() => import('./features/audit/SessionsScreen'));
+const OrganizationSettingsScreen = lazy(() => import('./features/settings/OrganizationSettingsScreen'));
+const AcceptInvitationScreen = lazy(() => import('./features/auth/AcceptInvitationScreen'));
+const VerifyEmailScreen = lazy(() => import('./features/auth/VerifyEmailScreen'));
+const VerifyEmailLanding = lazy(() => import('./features/auth/VerifyEmailLanding'));
+const AiAssistantWidget = lazy(() => import('./features/ai_assistant/AiAssistantWidget'));
+import { Sparkles, ShieldOff } from 'lucide-react';
+import { EmptyState, SkeletonBlock, SkeletonRows } from './shared/ui/States';
 import { useRBAC } from './core/rbac/RBACContext';
 import { PERMISSIONS } from './core/rbac/permissions';
 import EditProfileTab from './features/settings/components/EditProfileTab';
 
-const WATERMARK = 'Made with 🧡 by uncannystranger';
+/** Shown while a lazily-loaded section's chunk is still in flight. */
+function ScreenFallback() {
+  return (
+    <div className="space-y-4 py-6" role="status" aria-live="polite" aria-label="Loading section">
+      <SkeletonBlock className="h-8 w-56 rounded-xl" />
+      <SkeletonRows count={4} />
+    </div>
+  );
+}
 
 function MainAppContent() {
   const { isAuthenticated, isEmailVerified, authLoading, currentUser } = useAuth();
   const { hasPermission } = useRBAC();
   const inviteToken = window.location.pathname.match(/^\/invite\/([^/]+)$/)?.[1];
+  // Opened from the confirmation email — often on a different device, so this
+  // route must resolve before any session check.
+  const verifyToken = window.location.pathname.match(/^\/verify-email\/([^/]+)$/)?.[1];
   const [activeTab, setActiveTab] = useState('general');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,12 +86,12 @@ function MainAppContent() {
   useEffect(() => {
     if (authLoading) return;
     const path = window.location.pathname;
-    if (!isAuthenticated && path !== '/login' && !inviteToken) {
+    if (!isAuthenticated && path !== '/login' && !inviteToken && !verifyToken) {
       window.history.replaceState(null, '', '/login');
     } else if (isAuthenticated && path === '/login') {
       window.history.replaceState(null, '', '/');
     }
-  }, [isAuthenticated, authLoading, inviteToken]);
+  }, [isAuthenticated, authLoading, inviteToken, verifyToken]);
 
   // Global Keyboard Shortcuts & Navigation Listener
   useEffect(() => {
@@ -109,31 +124,16 @@ function MainAppContent() {
         return;
       }
 
-      // Keyboard scrolling when not typing in an editable field
       if (!isEditable(document.activeElement)) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          window.scrollBy({ top: 120, behavior: 'smooth' });
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          window.scrollBy({ top: -120, behavior: 'smooth' });
-        } else if (e.key === 'PageDown') {
-          e.preventDefault();
-          window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
-        } else if (e.key === 'PageUp') {
-          e.preventDefault();
-          window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
-        } else if (e.key === 'Home') {
-          e.preventDefault();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (e.key === 'End') {
-          e.preventDefault();
-          window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-        } else if (e.key === ' ' || e.code === 'Space') {
-          e.preventDefault();
-          const dist = e.shiftKey ? -window.innerHeight * 0.8 : window.innerHeight * 0.8;
-          window.scrollBy({ top: dist, behavior: 'smooth' });
-        }
+        const page = window.innerHeight * 0.8;
+        const scrollBy = (top) => { e.preventDefault(); window.scrollBy({ top, behavior: 'smooth' }); };
+        if (e.key === 'ArrowDown') scrollBy(120);
+        else if (e.key === 'ArrowUp') scrollBy(-120);
+        else if (e.key === 'PageDown') scrollBy(page);
+        else if (e.key === 'PageUp') scrollBy(-page);
+        else if (e.key === 'Home') { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        else if (e.key === 'End') { e.preventDefault(); window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }); }
+        else if (e.key === ' ' || e.code === 'Space') scrollBy(e.shiftKey ? -page : page);
       }
     };
 
@@ -142,14 +142,26 @@ function MainAppContent() {
   }, [isSearchOpen, isModalOpen, isProfileModalOpen, mobileNavOpen]);
 
   // 1. Full-screen Loading State during Startup Auth Verification
+  if (verifyToken) {
+    return (
+      <Suspense fallback={<ScreenFallback />}>
+        <VerifyEmailLanding token={verifyToken} />
+      </Suspense>
+    );
+  }
+
   if (inviteToken) {
-    return <AcceptInvitationScreen token={inviteToken} />;
+    return (
+      <Suspense fallback={<ScreenFallback />}>
+        <AcceptInvitationScreen token={inviteToken} />
+      </Suspense>
+    );
   }
 
   if (loaderVisible) {
     return (
       <div
-        className="min-h-screen w-full flex flex-col items-center justify-center bg-[#EBF0F7] dark:bg-[#0B0F17]"
+        className="ds-app-shell min-h-screen w-full flex flex-col items-center justify-center"
         style={{
           opacity: loaderExiting ? 0 : 1,
           transition: 'opacity 350ms cubic-bezier(0.4,0,0.2,1)',
@@ -179,8 +191,14 @@ function MainAppContent() {
   }
 
   // 3. Email Registration Verification Restriction Gateway
-  if (!isEmailVerified && currentUser?.requiresEmailVerification !== false) {
-    return <VerifyEmailScreen />;
+  // Gate on the server's verification record. Direct navigation cannot bypass
+  // this, and even if it could, every data route rejects an unverified account.
+  if (!isEmailVerified) {
+    return (
+      <Suspense fallback={<ScreenFallback />}>
+        <VerifyEmailScreen />
+      </Suspense>
+    );
   }
 
   // 4. Authenticated & Verified Dashboard Workspace Access
@@ -219,7 +237,13 @@ function MainAppContent() {
   const blockedSection = sectionPermissions[currentSection] && !hasPermission(sectionPermissions[currentSection]);
 
   return (
-    <div className="min-h-screen flex bg-[#EBF0F7] dark:bg-[#0B0F17] text-slate-800 dark:text-slate-100 min-w-0">
+    <div className="ds-app-shell min-h-screen flex text-[var(--ds-text)] min-w-0">
+      <a
+        href="#workspace-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] ds-btn ds-btn-primary ds-btn-sm"
+      >
+        Skip to main content
+      </a>
       
       {/* Floating Sidebar (Desktop Fixed + Mobile Overlay Drawer) */}
       <Sidebar 
@@ -243,13 +267,15 @@ function MainAppContent() {
         />
 
         {/* View Router */}
-        <main key={currentSection} className="flex-1 mt-2 animate-page-transition">
+        <main id="workspace-main" tabIndex={-1} key={currentSection} className="flex-1 mt-2 animate-page-transition focus:outline-none">
+          <Suspense fallback={<ScreenFallback />}>
           {blockedSection && (
-            <div className="glass-panel rounded-4xl p-8 text-center">
-              <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">403 Forbidden</h2>
-              <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Your role does not have access to this workspace section.
-              </p>
+            <div className="glass-panel rounded-3xl">
+              <EmptyState
+                icon={ShieldOff}
+                title="You don't have access to this section"
+                description="Your role does not include permission for this part of the workspace. An owner or admin can grant it from Team & Employees."
+              />
             </div>
           )}
 
@@ -294,11 +320,12 @@ function MainAppContent() {
               ? <OrganizationSettingsScreen />
               : <SettingsScreen initialTab={activeTab === 'profile' ? 'profile' : undefined} />
           )}
+          </Suspense>
         </main>
 
-        <footer className="flex items-center justify-center py-4 text-[10px] font-semibold tracking-[0.16em] text-slate-400 dark:text-slate-500">
-          <span>{WATERMARK.replace('🧡', '')}</span>
-          <span className="mx-1 text-orange-500" aria-label="love">🧡</span>
+        <footer className="flex items-center justify-center gap-1 py-5 text-[10px] font-semibold tracking-[0.14em] text-[var(--ds-text-muted)]">
+          <span>Made with</span>
+          <span className="text-orange-500" role="img" aria-label="love">🧡</span>
           <span>by uncannystranger</span>
         </footer>
 
@@ -319,7 +346,7 @@ function MainAppContent() {
 
       {isProfileModalOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6 bg-slate-950/45 backdrop-blur-md animate-fade-in-up"
+          className="glass-scrim fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6 animate-fade-in-up"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setIsProfileModalOpen(false);
@@ -329,9 +356,9 @@ function MainAppContent() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-profile-title"
-            className="relative w-full max-w-4xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto glass-panel rounded-[2rem] shadow-2xl animate-fade-scale"
+            className="relative w-full max-w-4xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto glass glass-strong rounded-[1.75rem] animate-fade-scale"
           >
-            <div className="sticky top-0 z-10 flex items-center justify-between px-5 sm:px-7 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800">
+            <div className="sticky top-0 z-10 flex items-center justify-between px-5 sm:px-7 py-4 glass-chrome">
               <div>
                 <h2 id="edit-profile-title" className="text-base font-black text-slate-900 dark:text-white">Edit Profile</h2>
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Update your personal details and profile image.</p>
@@ -353,10 +380,12 @@ function MainAppContent() {
       )}
 
       {/* Floating Interactive AI Assistant with Micro-Animations & Monthly Report */}
-      <AiAssistantWidget 
-        setActiveTab={setActiveTab} 
-        onOpenAddProduct={() => setIsModalOpen(true)} 
-      />
+      <Suspense fallback={null}>
+        <AiAssistantWidget 
+          setActiveTab={setActiveTab} 
+          onOpenAddProduct={() => setIsModalOpen(true)} 
+        />
+      </Suspense>
 
       {/* Floating Bottom-Right Toast Notifications */}
       <NotificationToast />

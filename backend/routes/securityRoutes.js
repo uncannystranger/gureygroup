@@ -1,11 +1,12 @@
 import express from 'express';
-import { enforceTenantIsolation, requireRole } from '../middleware/auth.js';
+import { enforceTenantIsolation, requireRole, requireVerifiedEmail } from '../middleware/auth.js';
 import { getSecurityAuditLogs } from '../middleware/securityShield.js';
 
 const router = express.Router();
 
 // Apply Auth Protection
 router.use(enforceTenantIsolation);
+router.use(requireVerifiedEmail);
 
 /**
  * GET /api/security/audit
