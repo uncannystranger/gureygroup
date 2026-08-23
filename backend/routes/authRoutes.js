@@ -40,6 +40,7 @@ const pickEmployeeFields = (updates) => Object.fromEntries(
  */
 router.post('/google', async (req, res) => {
   try {
+<<<<<<< HEAD
     let identity;
     try {
       identity = await verifyFirebaseIdToken(req.body?.idToken);
@@ -51,6 +52,45 @@ router.post('/google', async (req, res) => {
     const email = identity.email;
     const displayName = identity.name || req.body?.displayName || email.split('@')[0];
     const photoURL = identity.picture || req.body?.photoURL || '';
+=======
+    const authorization = req.get('authorization');
+    if (!authorization?.startsWith('Bearer ')) {
+      // Development fallback: allow dev-login
+      if (process.env.ALLOW_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
+        return res.status(401).json({ 
+          error: 'Firebase ID token required',
+          devNote: 'Use POST /api/auth/dev-login for development'
+        });
+      }
+      return res.status(401).json({ error: 'Firebase ID token required' });
+    }
+
+    const firebaseAdminAuth = getFirebaseAdminAuth();
+    if (!firebaseAdminAuth) {
+      // Development fallback
+      if (process.env.ALLOW_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
+        return res.status(401).json({ 
+          error: 'Firebase Admin SDK not configured',
+          devNote: 'Use POST /api/auth/dev-login for development'
+        });
+      }
+      return res.status(503).json({
+        error: 'Service configuration unavailable',
+        code: 'CONFIGURATION_MISSING',
+        message: 'The service is missing required authentication configuration. Contact the administrator.',
+      });
+    }
+
+    const decodedToken = await firebaseAdminAuth.verifyIdToken(authorization.slice(7));
+    const firebaseUid = decodedToken.uid;
+    const email = decodedToken.email?.toLowerCase();
+    const displayName = decodedToken.name || req.body.displayName;
+    const photoURL = decodedToken.picture || req.body.photoURL;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Firebase account email is required' });
+    }
+>>>>>>> 1af08cd (feat(auth): add graceful offline retry and dev auth fallback for local development)
 
     let user = await User.findOne({ email: email.toLowerCase() });
     let company;
@@ -315,6 +355,7 @@ router.patch('/profile', enforceTenantIsolation, async (req, res) => {
 });
 
 /**
+/**
  * GET /api/auth/verification/status
  * The authoritative verification state for the signed-in account.
  */
@@ -408,6 +449,130 @@ router.post('/verification/confirm', async (req, res) => {
   } catch (error) {
     console.error('Verification Confirm Error:', error);
     res.status(500).json({ error: 'Unable to confirm this verification link.' });
+  }
+});
+
+/**
+ * POST /api/auth/dev-login
+ * Development-only login endpoint (no Firebase required)
+ */
+router.post('/dev-login', async (req, res) => {
+  try {
+    // Only allow in development
+    if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DEV_AUTH !== 'true') {
+      return res.status(403).json({ error: 'Development login not available' });
+    }
+
+    const { email, displayName } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const emailLower = email.toLowerCase();
+    const firebaseUid = `dev_${emailLower.replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
+
+    let user = await User.findOne({ email: emailLower });
+    let company;
+    let membership;
+
+    if (!user) {
+      // Create new user with dev company
+      const newCompanyId = `comp_dev_${Date.now().toString(36)}`;
+      company = await Company.create({
+        companyId: newCompanyId,
+        name: `${displayName ? displayName.split(' ')[0] : 'Developer'} Dev Company`,
+        ownerUid: firebaseUid,
+        ownerEmail: emailLower,
+        subscriptionTier: 'Enterprise SaaS'
+      });
+
+      user = await User.create({
+        firebaseUid,
+        email: emailLower,
+        displayName: displayName || 'Developer',
+        photoURL: '',
+        companyId: newCompanyId,
+        role: 'Owner',
+        permissions: getPermissionsForRole('Owner')
+      });
+
+      await Organization.findOneAndUpdate(
+        { companyId: newCompanyId },
+        {
+          companyId: newCompanyId,
+          name: company.name,
+          ownerId: firebaseUid,
+          ownerEmail: emailLower,
+          currency: 'USD',
+          currencySymbol: '$',
+          timezone: 'UTC',
+          subscription: { plan: 'Enterprise', status: 'active' },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      membership = await Membership.findOneAndUpdate(
+        { companyId: newCompanyId, userId: firebaseUid },
+        {
+          companyId: newCompanyId,
+          userId: firebaseUid,
+          role: 'Owner',
+          permissions: getPermissionsForRole('Owner'),
+          status: 'active',
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    } else {
+      // Existing user
+      const activeMembership = await Membership.findOne({ userId: user.firebaseUid, status: 'active' }).sort({ updatedAt: -1 });
+      if (activeMembership) {
+        user.companyId = activeMembership.companyId;
+        user.role = activeMembership.role;
+        membership = activeMembership;
+      }
+      company = await Company.findOne({ companyId: user.companyId })
+        || await Organization.findOne({ companyId: user.companyId });
+      user.lastLogin = new Date();
+      await user.save();
+    }
+
+    const token = jwt.sign(
+      {
+        uid: user.firebaseUid,
+        email: user.email,
+        accountType: 'owner',
+        companyId: membership?.companyId || user.companyId,
+        role: membership?.role || user.role,
+        permissions: membership?.permissions || user.permissions || [],
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log(`[DEV AUTH] User login: ${emailLower} | Company: ${user.companyId}`);
+
+    res.json({
+      token,
+      user: {
+        uid: user.firebaseUid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        accountType: 'owner',
+        role: membership?.role || user.role,
+        permissions: membership?.permissions || user.permissions || [],
+        companyId: membership?.companyId || user.companyId
+      },
+      company,
+      devMode: true
+    });
+
+  } catch (error) {
+    console.error('Dev Auth Error:', error);
+    res.status(500).json({
+      error: 'Development login failed',
+      message: error.message,
+    });
   }
 });
 

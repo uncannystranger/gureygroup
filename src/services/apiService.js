@@ -161,6 +161,11 @@ export const authAPI = {
     body: JSON.stringify(data),
   }),
 
+  devLogin: (email, displayName) => apiFetch('/auth/dev-login', {
+    method: 'POST',
+    body: JSON.stringify({ email, displayName }),
+  }),
+
   me: () => apiFetch('/auth/me'),
 
   updateProfile: (updates) => apiFetch('/auth/profile', {

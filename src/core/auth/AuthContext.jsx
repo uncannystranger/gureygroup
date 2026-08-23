@@ -296,6 +296,8 @@ export function AuthProvider({ children }) {
       console.error("Google Auth error:", err);
       if (err.code === 'auth/popup-closed-by-user') {
         setAuthError('Google sign in popup was closed before completion.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setAuthError('Google authentication is not configured for this domain. Please use email/password login instead.');
       } else {
         setAuthError(err.message || 'Google sign in failed. Please try again.');
       }
@@ -310,14 +312,59 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setAuthError(null);
     try {
+      // Check if we're in development mode and Firebase isn't available
+      const isDev = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE;
+      
       let cred;
+      let fbUser;
+      let useDevAuth = false;
+
       try {
         cred = await withFirebaseNetworkRetry(() => signInWithEmailAndPassword(auth, email, password));
+        fbUser = cred.user;
       } catch (firebaseError) {
-        throw firebaseError;
+        // If Firebase fails and we're in development, try dev-login
+        if (isDev && firebaseError.code === 'auth/network-request-failed') {
+          console.warn('[Auth] Firebase unavailable, trying dev-login...');
+          useDevAuth = true;
+        } else {
+          throw firebaseError;
+        }
       }
-      const fbUser = cred.user;
 
+      if (useDevAuth) {
+        // Development mode: use backend dev-login endpoint
+        try {
+          const synced = await authAPI.devLogin(email, email.split('@')[0]);
+          
+          const companyObj = normalizeBackendCompany(synced.company);
+          const userObj = {
+            uid: synced.user.uid,
+            email: synced.user.email,
+            displayName: synced.user.displayName || synced.user.email.split('@')[0],
+            photoURL: synced.user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(synced.user.displayName || synced.user.email)}&background=6366F1&color=fff`,
+            emailVerified: true,
+            role: synced.user.role,
+            permissions: synced.user.permissions || [],
+            companyId: synced.user.companyId,
+            accountType: synced.user.accountType || 'owner'
+          };
+
+          localStorage.setItem('gurey_auth_token', synced.token);
+          localStorage.setItem('gurey_auth_user', JSON.stringify(userObj));
+          localStorage.setItem('gurey_tenant_company', JSON.stringify(companyObj));
+          localStorage.setItem('gurey_active_company', companyObj.id);
+          localStorage.setItem('gurey_dev_auth', 'true');
+
+          setCurrentUser(userObj);
+          setTenantCompany(companyObj);
+          return { user: userObj, company: companyObj };
+        } catch (devAuthErr) {
+          throw new Error('Development authentication failed: ' + devAuthErr.message);
+        }
+      }
+
+      // Normal Firebase flow
       try {
         await fbUser.reload();
       } catch (e) {
@@ -382,18 +429,55 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setAuthError(null);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      const fbUser = cred.user;
+      const isDev = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE;
+      let fbUser;
 
-      // Update user profile display name
-      if (fullName) {
-        await updateProfile(fbUser, { displayName: fullName }).catch(e => console.warn("Update profile error:", e));
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        fbUser = cred.user;
+
+        // Update user profile display name
+        if (fullName) {
+          await updateProfile(fbUser, { displayName: fullName }).catch(e => console.warn("Update profile error:", e));
+        }
+
+        // Send Email Verification Automatically
+        await sendEmailVerification(fbUser).catch(e => {
+          console.warn("Automatic verification email dispatch failed:", e);
+        });
+      } catch (firebaseError) {
+        // If Firebase fails and we're in development, try dev-login for signup
+        if (isDev && firebaseError.code === 'auth/network-request-failed') {
+          console.warn('[Auth] Firebase unavailable for signup, using dev-login...');
+          const synced = await authAPI.devLogin(email, fullName || email.split('@')[0]);
+          
+          const companyObj = companyName ? { ...synced.company, name: companyName } : normalizeBackendCompany(synced.company);
+          const userObj = {
+            uid: synced.user.uid,
+            email: synced.user.email,
+            displayName: synced.user.displayName || synced.user.email.split('@')[0],
+            photoURL: synced.user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(synced.user.displayName || synced.user.email)}&background=6366F1&color=fff`,
+            emailVerified: true,
+            role: synced.user.role,
+            permissions: synced.user.permissions || [],
+            companyId: synced.user.companyId,
+            accountType: synced.user.accountType || 'owner'
+          };
+
+          localStorage.setItem('gurey_auth_token', synced.token);
+          localStorage.setItem('gurey_auth_user', JSON.stringify(userObj));
+          localStorage.setItem('gurey_tenant_company', JSON.stringify(companyObj));
+          localStorage.setItem('gurey_active_company', companyObj.id);
+          localStorage.setItem('gurey_dev_auth', 'true');
+
+          registerAccountWorkspace(userObj, companyObj);
+          setCurrentUser(userObj);
+          setTenantCompany(companyObj);
+          return { user: userObj, company: companyObj };
+        } else {
+          throw firebaseError;
+        }
       }
-
-      // Send Email Verification Automatically
-      await sendEmailVerification(fbUser).catch(e => {
-        console.warn("Automatic verification email dispatch failed:", e);
-      });
 
       const { user, company } = await syncBackendAuth(fbUser);
 

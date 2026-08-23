@@ -4,6 +4,8 @@ import { connectMongoDB, mongoStatus } from './config/mongodb.js';
 import { runMigrations } from './migrations/runner.js';
 
 const PORT = BACKEND_PORT;
+const RETRY_DELAY_MS = 10000;
+let migrationsCompleted = false;
 
 // Initialize MongoDB & Start Express Server
 connectMongoDB().then(async () => {
