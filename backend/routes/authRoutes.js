@@ -40,7 +40,6 @@ const pickEmployeeFields = (updates) => Object.fromEntries(
  */
 router.post('/google', async (req, res) => {
   try {
-<<<<<<< HEAD
     let identity;
     try {
       identity = await verifyFirebaseIdToken(req.body?.idToken);
@@ -52,45 +51,6 @@ router.post('/google', async (req, res) => {
     const email = identity.email;
     const displayName = identity.name || req.body?.displayName || email.split('@')[0];
     const photoURL = identity.picture || req.body?.photoURL || '';
-=======
-    const authorization = req.get('authorization');
-    if (!authorization?.startsWith('Bearer ')) {
-      // Development fallback: allow dev-login
-      if (process.env.ALLOW_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
-        return res.status(401).json({ 
-          error: 'Firebase ID token required',
-          devNote: 'Use POST /api/auth/dev-login for development'
-        });
-      }
-      return res.status(401).json({ error: 'Firebase ID token required' });
-    }
-
-    const firebaseAdminAuth = getFirebaseAdminAuth();
-    if (!firebaseAdminAuth) {
-      // Development fallback
-      if (process.env.ALLOW_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
-        return res.status(401).json({ 
-          error: 'Firebase Admin SDK not configured',
-          devNote: 'Use POST /api/auth/dev-login for development'
-        });
-      }
-      return res.status(503).json({
-        error: 'Service configuration unavailable',
-        code: 'CONFIGURATION_MISSING',
-        message: 'The service is missing required authentication configuration. Contact the administrator.',
-      });
-    }
-
-    const decodedToken = await firebaseAdminAuth.verifyIdToken(authorization.slice(7));
-    const firebaseUid = decodedToken.uid;
-    const email = decodedToken.email?.toLowerCase();
-    const displayName = decodedToken.name || req.body.displayName;
-    const photoURL = decodedToken.picture || req.body.photoURL;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Firebase account email is required' });
-    }
->>>>>>> 1af08cd (feat(auth): add graceful offline retry and dev auth fallback for local development)
 
     let user = await User.findOne({ email: email.toLowerCase() });
     let company;
