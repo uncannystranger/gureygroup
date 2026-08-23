@@ -24,6 +24,7 @@ import { securityShieldMiddleware } from './middleware/securityShield.js';
 import { mongoStatus, requireMongoConnection } from './config/mongodb.js';
 
 const app = express();
+app.set('trust proxy', 1);
 const IS_PROD = process.env.NODE_ENV === 'production';
 export const REGISTERED_API_ROUTES = [
   'GET /api/health',
