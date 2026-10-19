@@ -10,3 +10,5 @@ All design and motion references are from Awwwards. Keep the existing indigo com
 | Shared dialogs | Contained keyboard focus, Escape, return to trigger | Scrollable sheet, native keyboard access | [Eduard Bodak navigation](https://www.awwwards.com/inspiration/navigation-micro-animation-eduard-bodak-portfolio) |
 
 Retain APIs, authentication, inventory and checkout calculations, tenant authorization and stored formats. Respect reduced motion. Production publication is separate.
+
+Startup failure uses a quiet centered recovery panel and a single reload action, adapting the same Bodak feedback reference. No configuration or stack details are shown in the product UI.

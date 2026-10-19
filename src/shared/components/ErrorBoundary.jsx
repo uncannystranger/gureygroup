@@ -36,6 +36,7 @@ export class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback;
       return (
         <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-8 bg-[#EBF0F7] dark:bg-[#0B0F17] text-slate-800 dark:text-slate-100 font-sans selection:bg-indigo-500 selection:text-white">
           <div className="max-w-lg w-full glass-panel rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-200/80 dark:border-slate-800 text-center flex flex-col items-center gap-5 animate-fade-in-up">
