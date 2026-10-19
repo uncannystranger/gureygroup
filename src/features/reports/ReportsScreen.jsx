@@ -66,7 +66,7 @@ export default function ReportsScreen() {
   };
 
   return (
-    <div className="space-y-6 pb-12 page-enter">
+    <div className="commerce-report space-y-6 pb-12 page-enter">
       
       {/* Top Header & Export Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -138,41 +138,41 @@ export default function ReportsScreen() {
 
       {/* Commercial Quick Stats Bar */}
       <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="glass-panel rounded-3xl p-4 card-hover-lift">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400">{t('dashboard.total_revenue', 'Total Sales Revenue')}</span>
+        <div className="glass-panel rounded-3xl p-4">
+          <span className="text-xs font-extrabold uppercase text-slate-400">{t('dashboard.total_revenue', 'Total Sales Revenue')}</span>
           <p className="text-xl font-black text-slate-900 dark:text-white mt-1">
             <AnimatedCounter value={totalSalesRevenue} prefix="$" decimals={2} />
           </p>
-          <span className="text-[10px] font-bold text-emerald-500 mt-1 block">AOV: ${averageBasketValue.toFixed(2)}</span>
+          <span className="text-xs font-bold text-emerald-500 mt-1 block">AOV: ${averageBasketValue.toFixed(2)}</span>
         </div>
 
-        <div className="glass-panel rounded-3xl p-4 card-hover-lift">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400">{t('reports.net_income', 'Est. Gross Profit')}</span>
+        <div className="glass-panel rounded-3xl p-4">
+          <span className="text-xs font-extrabold uppercase text-slate-400">{t('reports.net_income', 'Est. Gross Profit')}</span>
           <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
             <AnimatedCounter value={estimatedGrossProfit} prefix="$" decimals={2} />
           </p>
-          <span className="text-[10px] font-bold text-emerald-500 mt-1 block">{t('dashboard.gross_margin', 'Margin')}: {grossMarginEst}%</span>
+          <span className="text-xs font-bold text-emerald-500 mt-1 block">{t('dashboard.gross_margin', 'Margin')}: {grossMarginEst}%</span>
         </div>
 
-        <div className="glass-panel rounded-3xl p-4 card-hover-lift">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400">{t('common.tax', 'Total Tax Collected')}</span>
+        <div className="glass-panel rounded-3xl p-4">
+          <span className="text-xs font-extrabold uppercase text-slate-400">{t('common.tax', 'Total Tax Collected')}</span>
           <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
             <AnimatedCounter value={totalTaxCollected} prefix="$" decimals={2} />
           </p>
-          <span className="text-[10px] font-bold text-slate-400 mt-1 block">Tax Rate: {Number(activeCompany?.taxRate ?? 0).toFixed(2)}%</span>
+          <span className="text-xs font-bold text-slate-400 mt-1 block">Tax Rate: {Number(activeCompany?.taxRate ?? 0).toFixed(2)}%</span>
         </div>
 
-        <div className="glass-panel rounded-3xl p-4 card-hover-lift">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400">{t('reports.inventory_valuation', 'Inventory Cost Value')}</span>
+        <div className="glass-panel rounded-3xl p-4">
+          <span className="text-xs font-extrabold uppercase text-slate-400">{t('reports.inventory_valuation', 'Inventory Cost Value')}</span>
           <p className="text-xl font-black text-slate-900 dark:text-white mt-1">
             <AnimatedCounter value={totalInventoryValue} prefix="$" decimals={2} />
           </p>
-          <span className="text-[10px] font-bold text-slate-400 mt-1 block">Retail: ${totalRetailPotentialValue.toFixed(2)}</span>
+          <span className="text-xs font-bold text-slate-400 mt-1 block">Retail: ${totalRetailPotentialValue.toFixed(2)}</span>
         </div>
       </div>
 
       {/* Active Report View Canvas */}
-      <div className="glass-panel rounded-4xl p-6 relative space-y-6 card-hover-lift">
+      <div className="glass-panel rounded-4xl p-6 relative space-y-6">
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/60 dark:border-slate-800">
           <div>
@@ -266,7 +266,7 @@ export default function ReportsScreen() {
                   <tr><td colSpan="6" className="py-10 text-center">No products in inventory. Add products to see valuation data.</td></tr>
                 ) : (
                   products.filter(p => !p.isArchived).map((p) => (
-                    <tr key={p.id} className="hover:bg-white/40 dark:hover:bg-slate-800/40 animate-fade-in-up">
+                    <tr key={p.id} className="hover:bg-white/40 dark:hover:bg-slate-800/40">
                       <td className="ds-cell-strong">{p.name}</td>
                       <td className="py-3 font-mono text-slate-400">{p.sku}</td>
                       <td className="py-3 font-bold">{p.quantity} {p.unit}</td>

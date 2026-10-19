@@ -33,11 +33,11 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isBranchOpen, setIsBranchOpen] = useState(false);
+
   
   const profileRef = useRef(null);
   const notifRef = useRef(null);
-  const branchRef = useRef(null);
+
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -49,7 +49,7 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
       }
-      if (branchRef.current && !branchRef.current.contains(event.target)) setIsBranchOpen(false);
+
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -76,7 +76,7 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
   const isDashboard = ['dashboard', 'overview', 'general', ''].includes(currentTab || 'general');
 
   return (
-    <header className="w-full flex items-center justify-between pt-6 pb-4 px-2">
+    <header className="workspace-header w-full flex flex-wrap gap-3 items-center justify-between pt-6 pb-4 px-2">
       {/* Brand Title / Personalized Dynamic Greeting + Mobile Hamburger Toggle */}
       <div className="flex min-w-0 items-center gap-3">
         {/* Mobile Hamburger Button */}
@@ -112,7 +112,7 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
       </div>
 
       {/* Right Controls: Search Bar -> Theme Toggle -> Notifications -> Profile Picture Avatar */}
-      <div className="flex shrink-0 items-center space-x-2 sm:space-x-3">
+      <div className="workspace-header-controls flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
         {/* Search Bar */}
         <button
           onClick={onOpenSearch}
@@ -128,37 +128,15 @@ export default function Header({ setActiveTab, onOpenSearch, onOpenProfile, curr
         </button>
 
         {branches.length > 0 && (
-          <div className="relative hidden md:block" ref={branchRef}>
-            <button
-              type="button"
-              onClick={() => setIsBranchOpen((open) => !open)}
-              className="flex items-center gap-2 px-3 h-10 rounded-xl glass glass-faint text-left hover:border-[var(--ds-accent)] transition-colors"
-              aria-haspopup="listbox"
-              aria-expanded={isBranchOpen}
-              aria-label={`${t('common.branch', 'Branch')}: ${activeBranch?.name || t('common.select_branch', 'Select branch')}`}
-            >
-              <span className="w-7 h-7 rounded-xl bg-indigo-500/15 flex items-center justify-center"><Building2 className="w-3.5 h-3.5 text-indigo-500" /></span>
-              <span className="hidden lg:block max-w-[126px]">
-                <span className="block text-[10px] uppercase tracking-wider font-black text-slate-400">Branch</span>
-                <span className="block truncate text-xs font-black text-slate-800 dark:text-white">{activeBranch?.name || 'Select branch'}</span>
-              </span>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isBranchOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {isBranchOpen && (
-              <div className="absolute right-0 top-12 z-50 w-[330px] max-w-[calc(100vw-1.5rem)] p-2 rounded-2xl glass glass-strong animate-dropdown">
-                <div className="px-3 py-2 mb-1"><p className="text-xs font-black text-slate-900 dark:text-white">Your locations</p><p className="text-[10px] font-medium text-slate-400">Switching updates your whole workspace</p></div>
-                <div className="max-h-80 overflow-y-auto space-y-1">
-                  {branches.map((branch) => {
-                    const selected = branch.id === activeBranchId;
-                    return <button key={branch.id} type="button" disabled={!branch.isActive} onClick={() => { setActiveBranchId(branch.id); setIsBranchOpen(false); }} className={`w-full p-3 rounded-2xl text-left transition-all ${selected ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200'} ${!branch.isActive ? 'opacity-45 cursor-not-allowed' : ''}`}>
-                      <div className="flex items-center justify-between gap-3"><span className="font-black text-xs truncate">{branch.name}</span><span className={`text-[9px] font-black uppercase ${selected ? 'text-indigo-100' : branch.isActive ? 'text-emerald-500' : 'text-slate-400'}`}>{branch.isActive ? 'Active' : 'Inactive'}</span></div>
-                      <div className={`mt-2 grid grid-cols-3 gap-1 text-[10px] font-bold ${selected ? 'text-indigo-100' : 'text-slate-400'}`}><span className="flex items-center gap-1"><Users className="w-3 h-3" />{branch.employeeCount || 0}</span><span className="flex items-center gap-1"><Package className="w-3 h-3" />{branch.productCount || 0}</span><span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" />${Number(branch.todaySales || 0).toLocaleString()}</span></div>
-                    </button>;
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <label className="workspace-branch">
+            <Building2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span><span className="workspace-branch-label">{t('common.branch', 'Branch')}</span>
+              <select aria-label={t('common.branch', 'Branch')} value={activeBranchId || ''} onChange={event => setActiveBranchId(event.target.value)}>
+                {!activeBranchId && <option value="" disabled>{t('common.select_branch', 'Select branch')}</option>}
+                {branches.map(branch => <option key={branch.id} value={branch.id} disabled={!branch.isActive}>{branch.name}{!branch.isActive ? ' · Inactive' : ''}</option>)}
+              </select>
+            </span>
+          </label>
         )}
 
         {/* Notification Bell Dropdown */}

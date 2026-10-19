@@ -315,6 +315,8 @@ export default function POSScreen() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={handleKeyDownSearch}
+                  aria-label={t('pos.search_catalog', 'Scan barcode or type SKU/Name...')}
+                  aria-controls="pos-catalog"
                   placeholder={t('pos.search_catalog', 'Scan barcode or type SKU/Name...')}
                   className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none transition-all focus:border-indigo-500"
                   autoFocus
@@ -332,13 +334,15 @@ export default function POSScreen() {
               </div>
             </div>
 
+            <p className="catalog-result-count" role="status" aria-live="polite">{filteredProducts.length} {t('products.title', 'Products')}{searchTerm ? ` · “${searchTerm}”` : ''}</p>
             {/* Product Cards Grid */}
-            <div className="grid grid-cols-2 min-[430px]:grid-cols-3 gap-3 sm:gap-4 max-h-[68vh] overflow-y-auto pr-1">
+            <div id="pos-catalog" className="pos-catalog grid grid-cols-2 min-[430px]:grid-cols-3 gap-3 sm:gap-4 max-h-[68vh] overflow-y-auto pr-1">
               {filteredProducts.length === 0 ? (
                 <div className="col-span-full py-16 text-center">
                   <ShoppingCart className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                  <p className="text-xs font-semibold text-slate-400">No products in your catalog yet.</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Add products to start selling.</p>
+                  <p className="text-xs font-semibold text-slate-400">{searchTerm ? 'No matching products.' : 'No products in your catalog yet.'}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">{searchTerm ? 'Try a different name, SKU or barcode.' : 'Add products to start selling.'}</p>
+                  {searchTerm && <button type="button" className="ds-btn ds-btn-secondary mt-3" onClick={() => setSearchTerm('')}>Clear search</button>}
                 </div>
               ) : (
                 filteredProducts.map((prod) => (
@@ -346,7 +350,7 @@ export default function POSScreen() {
                     key={prod.id}
                     onClick={() => addToCart(prod)}
                     disabled={prod.quantity <= 0}
-                    className={`min-w-0 p-3 rounded-3xl glass-panel text-left flex flex-col justify-between min-h-44 h-auto hover:scale-[1.02] transition-all border border-white/60 dark:border-white/10 card-hover-lift animate-fade-in-up ${
+                    className={`min-w-0 p-3 rounded-3xl glass-panel text-left flex flex-col justify-between min-h-44 h-auto hover:scale-[1.02] transition-all border border-white/60 dark:border-white/10 pos-product-card ${
                       prod.quantity <= 0 ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
