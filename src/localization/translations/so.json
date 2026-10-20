@@ -145,7 +145,11 @@
     "change_due": "Hadafka la celinayo",
     "receipt_preview": "Muuqaalka Rasiidka",
     "invoice_preview": "Muuqaalka Qaansheegad",
-    "view_receipt": "Eeg Rasiidka"
+    "view_receipt": "Eeg Rasiidka",
+    "workspace": "GOOBTA IIBKA",
+    "terminal_title": "Miiskaaga iibka, oo isku xiran.",
+    "terminal_copy": "Raadi badeecad. Dhis dalab. Adeegga sii wad.",
+    "order": "DALABKA HADDA"
   },
   "reports": {
     "title": "Warbixinno & Xisaabaadka",

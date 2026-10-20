@@ -1,4 +1,4 @@
-import React, { useEffect, useId } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 
 /** Shared popup shell. Add Product is the visual source of truth for this component. */
@@ -15,19 +15,36 @@ export default function Modal({
   const generatedId = useId();
   const titleId = labelledBy || generatedId;
 
+  const dialogRef = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
   useEffect(() => {
     if (!isOpen) return undefined;
+    const opener = document.activeElement;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const focusable = () => [...dialogRef.current.querySelectorAll('a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')].filter(node => node.getClientRects().length);
+    const frame = requestAnimationFrame(() => (focusable()[0] || dialogRef.current)?.focus());
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
+      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (dialogs[dialogs.length - 1] !== dialogRef.current) return;
+      if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      const first = items[0]; const last = items[items.length - 1];
+      if (!items.length) { event.preventDefault(); dialogRef.current.focus(); }
+      else if (event.shiftKey && (document.activeElement === first || !dialogRef.current.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !dialogRef.current.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => {
+      cancelAnimationFrame(frame);
       document.body.style.overflow = originalOverflow;
+      if (opener?.isConnected) opener.focus();
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -40,9 +57,12 @@ export default function Modal({
       }}
     >
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={title ? titleId : undefined}
+        aria-labelledby={title || labelledBy ? titleId : undefined}
+        aria-label={!title && !labelledBy ? "Dialog" : undefined}
         className={`w-full min-w-0 ${className} glass glass-strong rounded-2xl sm:rounded-3xl p-5 sm:p-7 relative max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] overflow-y-auto overscroll-contain animate-fade-scale`}
         onMouseDown={(event) => event.stopPropagation()}
       >

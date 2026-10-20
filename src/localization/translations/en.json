@@ -145,7 +145,11 @@
     "change_due": "Change Due",
     "receipt_preview": "Receipt Preview",
     "invoice_preview": "Invoice Preview",
-    "view_receipt": "View Receipt"
+    "view_receipt": "View Receipt",
+    "workspace": "SALES WORKSPACE",
+    "terminal_title": "Your counter, connected.",
+    "terminal_copy": "Find a product. Build an order. Keep service moving.",
+    "order": "CURRENT ORDER"
   },
   "reports": {
     "title": "Financial & Sales Reports",

@@ -23,42 +23,8 @@ import HeldCartsModal from '../../shared/components/HeldCartsModal';
 import AddCustomerModal from '../../shared/components/AddCustomerModal';
 import QRPaymentModal from '../../shared/components/QRPaymentModal';
 import { useAuth } from '../../core/auth/AuthContext';
+import ProductTile from './ProductTile';
 import { useRBAC } from '../../core/rbac/RBACContext';
-
-function POSProductImageWithSkeleton({ src, alt }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  // Catalogue items without a photo used to sit under a permanently pulsing
-  // placeholder, which read as "still loading" on a screen that was idle.
-  if (!src || failed) {
-    return (
-      <div
-        className="w-full h-20 rounded-2xl mb-2 grid place-items-center"
-        style={{ background: 'var(--ds-surface-sunken)', color: 'var(--ds-text-muted)' }}
-        aria-hidden="true"
-      >
-        <Package className="w-4 h-4" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-full h-20 rounded-2xl overflow-hidden mb-2" style={{ background: 'var(--ds-surface-sunken)' }}>
-      {!loaded && <div className="absolute inset-0 skeleton" aria-hidden="true" />}
-      <img
-        src={src}
-        alt={alt}
-        loading="lazy"
-        onLoad={() => setLoaded(true)}
-        onError={() => setFailed(true)}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${
-          loaded ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
-    </div>
-  );
-}
 
 export default function POSScreen() {
   const { 
@@ -276,8 +242,9 @@ export default function POSScreen() {
   ];
 
   return (
-    <div className="space-y-6 pb-12 page-enter">
+    <div className="commerce-terminal space-y-6 pb-12 page-enter">
       
+      <div className="commerce-intro"><div><span className="commerce-kicker">{t('pos.workspace', 'SALES WORKSPACE')}</span><h2>{t('pos.terminal_title','Your counter, connected.')}</h2></div><p>{t('pos.terminal_copy','Find a product. Build an order. Keep service moving.')}</p></div>
       {/* Sub-Navigation Tabs for Sales Section */}
       <div className="ds-tabstrip flex sm:grid sm:grid-cols-5 gap-2 p-1.5 rounded-2xl glass-panel overflow-x-auto no-scrollbar">
         {salesSubTabs.map((tab) => {
@@ -305,7 +272,7 @@ export default function POSScreen() {
         <div className="responsive-page-grid grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Products Search & Selection Grid (7 Columns) */}
-          <div className="lg:col-span-7 space-y-4">
+          <div className="commerce-catalog lg:col-span-7 space-y-4">
             
             <div className="p-3 sm:p-4 rounded-3xl glass-panel border border-white/60 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
               <div className="relative flex-1">
@@ -315,6 +282,8 @@ export default function POSScreen() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={handleKeyDownSearch}
+                  aria-label={t('pos.search_catalog', 'Scan barcode or type SKU/Name...')}
+                  aria-controls="pos-catalog"
                   placeholder={t('pos.search_catalog', 'Scan barcode or type SKU/Name...')}
                   className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none transition-all focus:border-indigo-500"
                   autoFocus
@@ -332,41 +301,19 @@ export default function POSScreen() {
               </div>
             </div>
 
+            <p className="catalog-result-count" role="status" aria-live="polite">{filteredProducts.length} {t('products.title', 'Products')}{searchTerm ? ` · “${searchTerm}”` : ''}</p>
             {/* Product Cards Grid */}
-            <div className="grid grid-cols-2 min-[430px]:grid-cols-3 gap-3 sm:gap-4 max-h-[68vh] overflow-y-auto pr-1">
+            <div id="pos-catalog" className="pos-catalog grid grid-cols-2 min-[430px]:grid-cols-3 gap-3 sm:gap-4 max-h-[68vh] overflow-y-auto pr-1">
               {filteredProducts.length === 0 ? (
                 <div className="col-span-full py-16 text-center">
                   <ShoppingCart className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                  <p className="text-xs font-semibold text-slate-400">No products in your catalog yet.</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Add products to start selling.</p>
+                  <p className="text-xs font-semibold text-slate-400">{searchTerm ? 'No matching products.' : 'No products in your catalog yet.'}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">{searchTerm ? 'Try a different name, SKU or barcode.' : 'Add products to start selling.'}</p>
+                  {searchTerm && <button type="button" className="ds-btn ds-btn-secondary mt-3" onClick={() => setSearchTerm('')}>Clear search</button>}
                 </div>
               ) : (
                 filteredProducts.map((prod) => (
-                  <button
-                    key={prod.id}
-                    onClick={() => addToCart(prod)}
-                    disabled={prod.quantity <= 0}
-                    className={`min-w-0 p-3 rounded-3xl glass-panel text-left flex flex-col justify-between min-h-44 h-auto hover:scale-[1.02] transition-all border border-white/60 dark:border-white/10 card-hover-lift animate-fade-in-up ${
-                      prod.quantity <= 0 ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    <div>
-                      <POSProductImageWithSkeleton src={prod.images?.[0]} alt={prod.name} />
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">{prod.name}</h4>
-                      <p className="truncate text-[10px] font-semibold text-slate-400">SKU: {prod.sku}</p>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-800">
-                      <span className="text-xs font-black text-slate-900 dark:text-white">${prod.sellingPrice.toFixed(2)}</span>
-                      {prod.quantity <= 0 ? (
-                        <span className="ds-badge ds-badge-critical">{t('status.out_of_stock', 'Out of stock')}</span>
-                      ) : (
-                        <span className={`ds-badge ${prod.quantity <= prod.lowStockLevel ? 'ds-badge-warning' : 'ds-badge-neutral'}`}>
-                          {prod.quantity} {t('products.in_stock_short', 'left')}
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                  <ProductTile key={prod.id} product={prod} onAdd={()=>addToCart(prod)} stockLabel={t('products.in_stock_short','left')} unavailableLabel={t('status.out_of_stock','Out of stock')} />
                 ))
               )}
             </div>
@@ -374,8 +321,9 @@ export default function POSScreen() {
           </div>
 
           {/* POS Shopping Cart & Checkout Terminal (5 Columns) */}
-          <div className="lg:col-span-5 glass-panel rounded-4xl p-4 sm:p-6 relative flex flex-col justify-between min-h-0 lg:min-h-[75vh] card-hover-lift">
+          <div className="commerce-checkout lg:col-span-5 glass-panel rounded-4xl p-4 sm:p-6 relative flex flex-col justify-between min-h-0 lg:min-h-[75vh] card-hover-lift">
             
+            <div className="commerce-panel-label"><span>{t('pos.order','CURRENT ORDER')}</span><ShoppingCart size={17}/></div>
             {isCompleted ? (
               <div className="my-auto text-center space-y-4 animate-fade-scale">
                 <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-500 mx-auto flex items-center justify-center border border-emerald-300">

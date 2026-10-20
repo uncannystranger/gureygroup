@@ -297,6 +297,7 @@ export default function ProductsScreen({ onOpenAddProduct }) {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label={t('products.search_placeholder', 'Search by product name, SKU, or barcode...')}
                 placeholder={t('products.search_placeholder', 'Search by product name, SKU, or barcode...')}
                 className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none transition-all focus:border-indigo-500"
               />

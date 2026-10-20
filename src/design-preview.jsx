@@ -1,0 +1,264 @@
+import React, { useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  ShoppingCart,
+  Search,
+  Package,
+  ArrowUpRight,
+  Minus,
+  Plus,
+} from "lucide-react";
+import ProductTile from "./features/sales/ProductTile";
+import "./index.css";
+import "./design-preview.css";
+const products = [
+  {
+    id: "water",
+    name: "Bottled Water",
+    sku: "DR-001",
+    sellingPrice: 7,
+    quantity: 24,
+    lowStockLevel: 5,
+  },
+  {
+    id: "tea",
+    name: "Tea",
+    sku: "DR-002",
+    sellingPrice: 6,
+    quantity: 16,
+    lowStockLevel: 5,
+  },
+  {
+    id: "coffee",
+    name: "Coffee",
+    sku: "DR-003",
+    sellingPrice: 5,
+    quantity: 4,
+    lowStockLevel: 5,
+  },
+];
+function Preview() {
+  const [query, setQuery] = useState("");
+  const [cart, setCart] = useState({});
+  const [branch, setBranch] = useState("Central");
+  const [notice, setNotice] = useState("");
+  const [tab, setTab] = useState("Point of sale");
+  const [dark, setDark] = useState(true);
+  const add = (p, change = 1) => {
+    setCart((c) => ({
+      ...c,
+      [p.id]: Math.max(0, Math.min(p.quantity, (c[p.id] || 0) + change)),
+    }));
+    setNotice("");
+  };
+  const total = products.reduce(
+    (sum, p) => sum + p.sellingPrice * (cart[p.id] || 0),
+    0,
+  );
+  return (
+    <div className={dark ? "dark" : ""}>
+      <div className="commerce-preview">
+        <div className="preview-disclosure">
+          Frontend design preview · sample catalogue · no orders are submitted{" "}
+          <a href="/">Open application ↗</a>
+        </div>
+        <header className="preview-header">
+          <a href="/" className="preview-brand">
+            G<span>G</span>
+            <b>
+              GUREYGROUP<small>COMMERCE WORKSPACE</small>
+            </b>
+          </a>
+          <div className="preview-controls">
+            <label className="workspace-branch">
+              <span>
+                <span className="workspace-branch-label">Sample branch</span>
+                <select
+                  value={branch}
+                  onChange={(e) => {
+                    setBranch(e.target.value);
+                    setCart({});
+                    setNotice("Sample branch changed. Basket cleared.");
+                  }}
+                >
+                  <option>Central</option>
+                  <option>Airport</option>
+                </select>
+              </span>
+            </label>
+            <button type="button" onClick={() => setDark(!dark)}>
+              {dark ? "Light" : "Dark"} mode
+            </button>
+          </div>
+        </header>
+        <main className="commerce-terminal">
+          <div className="commerce-intro">
+            <div>
+              <span className="commerce-kicker">
+                SALES WORKSPACE / {branch}
+              </span>
+              <h1>Your counter, connected.</h1>
+            </div>
+            <p>
+              Find a product. Build an order.
+              <br />
+              Keep service moving.
+            </p>
+          </div>
+          <nav className="preview-tabs" aria-label="Preview workspaces">
+            {["Point of sale", "Inventory", "Reports"].map((t) => (
+              <button
+                key={t}
+                aria-pressed={tab === t}
+                onClick={() => setTab(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </nav>
+          {tab === "Point of sale" ? (
+            <div className="preview-terminal-grid">
+              <section className="commerce-catalog">
+                <label className="preview-search">
+                  <Search size={18} />
+                  <input
+                    aria-label="Search sample catalogue"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search product or SKU…"
+                  />
+                </label>
+                <p className="catalog-result-count">
+                  SAMPLE CATALOGUE ·{" "}
+                  {
+                    products.filter((p) =>
+                      (p.name + p.sku)
+                        .toLowerCase()
+                        .includes(query.toLowerCase()),
+                    ).length
+                  }{" "}
+                  PRODUCTS
+                </p>
+                <div className="pos-catalog preview-product-grid">
+                  {products
+                    .filter((p) =>
+                      (p.name + p.sku)
+                        .toLowerCase()
+                        .includes(query.toLowerCase()),
+                    )
+                    .map((p) => (
+                      <ProductTile
+                        product={p}
+                        key={p.id}
+                        onAdd={() => add(p)}
+                      />
+                    ))}
+                </div>
+                {!products.some((p) =>
+                  (p.name + p.sku).toLowerCase().includes(query.toLowerCase()),
+                ) && (
+                  <div className="preview-empty">
+                    <Package />
+                    <h3>No matching products</h3>
+                    <button onClick={() => setQuery("")}>Clear search</button>
+                  </div>
+                )}
+              </section>
+              <aside className="commerce-checkout">
+                <div className="commerce-panel-label">
+                  <span>SAMPLE ORDER</span>
+                  <ShoppingCart size={17} />
+                </div>
+                <div className="preview-customer">
+                  <span>Customer</span>
+                  <strong>Walk-in customer</strong>
+                  <small>{branch} branch · sample basket</small>
+                </div>
+                <div className="preview-cart">
+                  {products
+                    .filter((p) => cart[p.id] > 0)
+                    .map((p) => (
+                      <div className="preview-cart-row" key={p.id}>
+                        <span>
+                          <strong>{p.name}</strong>
+                          <small>${p.sellingPrice.toFixed(2)} each</small>
+                        </span>
+                        <div>
+                          <button
+                            aria-label={"Remove one " + p.name}
+                            onClick={() => add(p, -1)}
+                          >
+                            <Minus size={13} />
+                          </button>
+                          <b>{cart[p.id]}</b>
+                          <button
+                            aria-label={"Add one " + p.name}
+                            onClick={() => add(p)}
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  {!total && (
+                    <div className="preview-empty">
+                      <ShoppingCart size={28} />
+                      <h3>Ready for your first item</h3>
+                      <p>Select a product from the catalogue.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="preview-total">
+                  <span>Sample total</span>
+                  <strong>${total.toFixed(2)}</strong>
+                </div>
+                <button
+                  className="preview-primary"
+                  disabled={!total}
+                  onClick={() =>
+                    setNotice(
+                      "Design preview only. This sample order was not submitted. Stock and payments are unchanged.",
+                    )
+                  }
+                >
+                  Review sample order <ArrowUpRight size={18} />
+                </button>
+                <p role="status" className="preview-notice">
+                  {notice ||
+                    "No payment is collected in this frontend preview."}
+                </p>
+              </aside>
+            </div>
+          ) : (
+            <section className="preview-workspace">
+              <span className="commerce-kicker">{tab} / SAMPLE DATA</span>
+              <h2>
+                {tab === "Inventory"
+                  ? "Know what is on the shelf."
+                  : "A clear view of the counter."}
+              </h2>
+              <p>
+                This is an isolated presentation preview. Open the application
+                for your actual inventory and reports.
+              </p>
+              <div className="preview-stock-list">
+                {products.map((p) => (
+                  <div key={p.id}>
+                    <strong>{p.name}</strong>
+                    <span>{p.sku}</span>
+                    <b>
+                      {tab === "Inventory"
+                        ? p.quantity + " in stock"
+                        : "$" + p.sellingPrice.toFixed(2) + " unit price"}
+                    </b>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+createRoot(document.getElementById("root")).render(<Preview />);

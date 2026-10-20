@@ -16,6 +16,10 @@
       "destination": "/api/index.js"
     },
     {
+      "source": "/design",
+      "destination": "/design-preview.html"
+    },
+    {
       "source": "/((?!assets/|favicon.ico|vite.svg).*)",
       "destination": "/index.html"
     }
