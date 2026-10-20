@@ -1,3 +1,5 @@
+> **Latest release: v1.1.0** — [Release notes](RELEASE-NOTES.md) · [GitHub release](https://github.com/uncannystranger/gureygroup/releases/tag/v1.1.0)
+
 <div align="center">
 
  <img width="1440" height="672" alt="Screenshot 2026-08-22 at 11 08 24" src="https://github.com/user-attachments/assets/ee980b1b-8529-4741-a1e8-2705853db06f" />
