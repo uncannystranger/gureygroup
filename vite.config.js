@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
       // Vendor code changes far less often than app code; splitting it keeps
       // the large, stable dependencies in separately cacheable chunks.
       rollupOptions: {
+        input: { main: new URL('./index.html', import.meta.url).pathname, design: new URL('./design-preview.html', import.meta.url).pathname },
         output: {
           manualChunks: {
             'vendor-react': ['react', 'react-dom'],
